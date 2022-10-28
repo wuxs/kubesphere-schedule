@@ -1,0 +1,8 @@
+domain: kubesphere.io
+repo: kubesphere.io/schedule
+resources:
+- group: schedule
+  kind: Analysis
+  version: v1alpha1
+version: "2"
+
