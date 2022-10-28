@@ -50,9 +50,10 @@ type AnalysisStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +genclient
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Analysis is the Schema for the analyses API
 type Analysis struct {
@@ -64,6 +65,7 @@ type Analysis struct {
 }
 
 //+kubebuilder:object:root=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // AnalysisList contains a list of Analysis
 type AnalysisList struct {
