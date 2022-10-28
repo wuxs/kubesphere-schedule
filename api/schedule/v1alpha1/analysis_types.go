@@ -21,9 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type ResourceSelector = cranev1.ResourceSelector
-type CompletionStrategy = cranev1.CompletionStrategy
-
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -32,11 +29,11 @@ type AnalysisSpec struct {
 	// ResourceSelector indicates how to select resources(e.g. a set of Deployments) for an Analytics.
 	// +required
 	// +kubebuilder:validation:Required
-	ResourceSelectors []ResourceSelector `json:"resourceSelectors"`
+	ResourceSelectors []cranev1.ResourceSelector `json:"resourceSelectors"`
 
 	// CompletionStrategy indicate how to complete an Analytics.
 	// +optional
-	CompletionStrategy CompletionStrategy `json:"completionStrategy"`
+	CompletionStrategy cranev1.CompletionStrategy `json:"completionStrategy"`
 }
 
 // AnalysisStatus defines the observed state of Analysis
