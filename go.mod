@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/gocrane/api v0.6.1-0.20220721081535-2cf15fc58bf3
 	code.cloudfoundry.org/bytefmt v0.0.0-20211005130812-5bb3c17173e5
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
