@@ -1,0 +1,19 @@
+apiVersion: extensions.kubesphere.io/v1alpha1
+kind: APIService
+metadata:
+ name: v1alpha1.application.kubesphere.io
+spec:
+ group: schedule.io
+ version: v1alpha1
+ url: https://apiserver.kubesphere-schedule-system.svc:8000
+
+---
+
+apiVersion: extensions.kubesphere.io/v1alpha1
+kind: APIService
+metadata:
+ name: v1.application.kubesphere.io
+spec:
+ group: schedule.io
+ version: v1
+ url: https://apiservice.kubesphere-schedule-system.svc:8000

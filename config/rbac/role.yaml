@@ -1,0 +1,34 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: ks-schedule
+rules:
+- apiGroups:
+  - schedule.kubesphere.io
+  resources:
+  - analyses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - schedule.kubesphere.io
+  resources:
+  - analyses/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - schedule.kubesphere.io
+  resources:
+  - analyses/status
+  verbs:
+  - get
+  - patch
+  - update
