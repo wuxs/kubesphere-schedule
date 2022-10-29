@@ -263,3 +263,21 @@
 └── crds
 └── apiservice.yaml
 ```
+
+
+### 启动时报错
+
+```
+I1029 10:30:59.032622   98782 controller.go:165] controller/analysis "msg"="Starting EventSource" "reconciler group"="schedule.kubesphere.io" "reconciler kind"="Analysis" "source"={"Type":{"metadata":{"creationTimestamp":null},"spec":{"resourceSelectors":null,"completionStrategy":{}},"status":{}}}
+I1029 10:30:59.032668   98782 controller.go:173] controller/analysis "msg"="Starting Controller" "reconciler group"="schedule.kubesphere.io" "reconciler kind"="Analysis" 
+E1029 10:30:59.241859   98782 deleg.go:144] controller-runtime/source "msg"="if kind is a CRD, it should be installed before calling Start" "error"="no matches for kind \"Analysis\" in version \"schedule.kubesphere.io/v1alpha1\""  "kind"={"Group":"schedule.kubesphere.io","Kind":"Analysis"}
+E1029 10:30:59.241932   98782 controller.go:190] controller/analysis "msg"="Could not wait for Cache to sync" "error"="failed to wait for analysis caches to sync: no matches for kind \"Analysis\" in version \"schedule.kubesphere.io/v1alpha1\"" "reconciler group"="schedule.kubesphere.io" "reconciler kind"="Analysis" 
+F1029 10:30:59.242041   98782 server.go:198] unable to run the manager: failed to wait for analysis caches to sync: no matches for kind "Analysis" in version "schedule.kubesphere.io/v1alpha1"
+Exiting.
+```
+
+```
+cd /Users/neov/src/CNCF/kubesphere-schedule\n
+kubectl apply -f config/samples/schedule_v1alpha1_analysis.yaml
+```
+安装 CR 后修复

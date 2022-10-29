@@ -1,0 +1,24 @@
+apiVersion: schedule.kubesphere.io/v1alpha1
+kind: Analysis
+metadata:
+  labels:
+    app.kubernetes.io/name: analysis
+    app.kubernetes.io/instance: analysis-sample
+    app.kubernetes.io/part-of: kubesphere-schedule
+    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kubesphere-schedule
+  name: analysis-sample
+spec:
+  completionStrategy:
+    completionStrategyType: Periodical
+    periodSeconds: 86400
+  resourceSelectors:
+  - apiVersion: apps/v1
+    kind: Namespace
+    labelSelector: {}
+    name: keel-system
+  - apiVersion: apps/v1
+    kind: Namespace
+    labelSelector: {}
+    name: dapr-system
+
