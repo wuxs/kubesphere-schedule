@@ -45,14 +45,14 @@ uninstall: manifests
 	kustomize build config/crd | kubectl delete -f -
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests
+deploy: manifests kustomize
 	cd config/manager && kustomize edit set image controller=${CONTROLLER_IMG}
 	kustomize build config/default | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=ks-schedule webhook paths="./api/..." output:crd:artifacts:config=config/crd/bases output:rbac:none
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=ks-schedule webhook paths="./..." output:crd:none
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=ks-schedule webhook paths="./pkg/..." output:crd:none
 
 install-crd:
 	kubectl apply -f config/crd/bases
@@ -138,6 +138,13 @@ mock-gen:
 	mockgen -source=cmd/tools/jwt/app/configmap_updater.go -destination ./cmd/tools/jwt/app/mock_app/configmap_updater.go
 	mockgen -source=cmd/tools/jwt/app/kubernetes.go -destination ./cmd/tools/jwt/app/mock_app/kubernetes.go
 
+
+
+
+## Tool Versions
+KUSTOMIZE_VERSION ?= v4.5.5
+CONTROLLER_TOOLS_VERSION ?= v0.6.2
+
 # find or download controller-gen
 # download controller-gen if necessary
 controller-gen:
@@ -147,10 +154,29 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.2 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION) ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
+endif
+
+# find or download kustomize
+# download kustomize if necessary
+KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
+kustomize:
+ifeq (, $(shell which kustomize))
+	@{ \
+	KUSTOMIZE_TMP_DIR=$$(mktemp -d) ;\
+	cd $$KUSTOMIZE_TMP_DIR ;\
+	test -s $(LOCALBIN)/kustomize || { curl -Ss $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); } ;\
+	mv kustomize $(GOBIN)/ ;\
+	rm -rf $$KUSTOMIZE_TMP_DIR ;\
+	KUSTOMIZE=$(GOBIN)/kustomize  ;\
+	}
+else
+	@{ \
+	KUSTOMIZE=$(shell which kustomize) ;\
+	}
 endif
