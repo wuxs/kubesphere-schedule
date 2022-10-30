@@ -16,6 +16,12 @@ limitations under the License.
 
 package schedule
 
+import (
+	cranealpha1 "github.com/gocrane/api/analysis/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"kubesphere.io/schedule/api/schedule/v1alpha1"
+)
+
 //
 //import (
 //	"encoding/json"
@@ -842,3 +848,17 @@ package schedule
 //	appVersion = strings.TrimSpace(appVersion)
 //	return
 //}
+
+func convertAnalytics(target v1alpha1.ResourceSelector, strategy cranealpha1.CompletionStrategy) *cranealpha1.Analytics {
+	analytics := cranealpha1.Analytics{
+		ObjectMeta: metav1.ObjectMeta{},
+		Spec: cranealpha1.AnalyticsSpec{
+			Type: cranealpha1.AnalysisTypeResource,
+			ResourceSelectors: []cranealpha1.ResourceSelector{cranealpha1.ResourceSelector{
+				Kind: target.Kind, APIVersion: target.APIVersion, Name: target.Name,
+			}},
+			CompletionStrategy: strategy,
+		},
+	}
+	return &analytics
+}

@@ -21,6 +21,7 @@ const (
 
 	KubeSystemNamespace           = "kube-system"
 	ScheduleNamespace             = "schedule-system"
+	KubesphereScheduleNamespace   = "kubesphere-schedule-system"
 	KubesphereDevOpsNamespace     = "kubesphere-devops-system"
 	IstioNamespace                = "istio-system"
 	KubeSphereMonitoringNamespace = "kubesphere-monitoring-system"

@@ -88,6 +88,7 @@ func (s *ServerRunOptions) NewAPIServer(stopCh <-chan struct{}) (*apiserver.APIS
 	apiServer.KubernetesClient = kubernetesClient
 
 	informerFactory := informers.NewInformerFactories(kubernetesClient.Kubernetes(), kubernetesClient.KubeSphere(),
+		kubernetesClient.ExtResources(),
 		kubernetesClient.ApiExtensions())
 	apiServer.InformerFactory = informerFactory
 
@@ -95,7 +96,7 @@ func (s *ServerRunOptions) NewAPIServer(stopCh <-chan struct{}) (*apiserver.APIS
 		Addr: fmt.Sprintf(":%d", s.GenericServerRunOptions.InsecurePort),
 	}
 
-	apiServer.ScheduleClient = schedulev1.NewScheduleClient(informerFactory, apiServer.KubernetesClient.KubeSphere(), s.ScheduleOptions, stopCh)
+	apiServer.ScheduleClient = schedulev1.NewScheduleClient(informerFactory, apiServer.KubernetesClient.KubeSphere(), apiServer.KubernetesClient.ExtResources(), s.ScheduleOptions, stopCh)
 
 	if s.GenericServerRunOptions.SecurePort != 0 {
 		certificate, err := tls.LoadX509KeyPair(s.GenericServerRunOptions.TlsCertFile, s.GenericServerRunOptions.TlsPrivateKey)

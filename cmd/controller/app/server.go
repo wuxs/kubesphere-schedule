@@ -144,6 +144,7 @@ func run(s *options.KubeSphereControllerManagerOptions, ctx context.Context) err
 	informerFactory := informers.NewInformerFactories(
 		kubernetesClient.Kubernetes(),
 		kubernetesClient.KubeSphere(),
+		kubernetesClient.ExtResources(),
 		kubernetesClient.ApiExtensions())
 
 	mgrOptions := manager.Options{
@@ -191,6 +192,7 @@ func run(s *options.KubeSphereControllerManagerOptions, ctx context.Context) err
 
 	// Start cache data after all informer is registered
 	klog.V(0).Info("Starting cache resource from apiserver...")
+
 	informerFactory.Start(ctx.Done())
 
 	klog.V(0).Info("Starting the controllers.")

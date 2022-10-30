@@ -281,3 +281,63 @@ cd /Users/neov/src/CNCF/kubesphere-schedule\n
 kubectl apply -f config/samples/schedule_v1alpha1_analysis.yaml
 ```
 安装 CR 后修复
+
+### Crane 安装后不生效
+
+charts/crane/templates/scheduler-prometheus-rules.yaml
+需要修改为 
+```
+namespace: {{ .Values.global.prometheusNameSpace }}
+```
+该值应该为：
+```
+global:
+  prometheusAddr: http://prometheus-k8s.kubesphere-monitoring-system.svc.cluster.local:9090   # prometheus address
+  prometheusNameSpace: kubesphere-monitoring-system
+```
+
+
+### 找不到新增的 CR
+```
+E1030 12:24:15.916419   79293 controller.go:304] controller/analysis "msg"="Reconciler error" "error"="no kind is registered for the type v1alpha1.NamespaceAnalysis in scheme \"k8s.io/client-go/kubernetes/scheme/register.go:72\"" "name"="analysis-sample" "namespace"="default" "reconciler group"="schedule.kubesphere.io" "reconciler kind"="Analysis" 
+I1030 12:24:18.477386   79293 namespace_analysis_controller.go:69] [+]---4---
+E1030 12:24:18.477581   79293 controller.go:304] controller/analysis "msg"="Reconciler error" "error"="no kind is registered for the type v1alpha1.NamespaceAnalysis in scheme \"k8s.io/client-go/kubernetes/scheme/register.go:72\"" "name"="analysis-sample" "namespace"="default" "reconciler group"="schedule.kubesphere.io" "reconciler kind"="Analysis" 
+```
+
+Add `api/schedule/v1alpha1/types.go:126`
+```go
+func init() {
+	...
+	SchemeBuilder.Register(&NamespaceAnalysis{}, &NamespaceAnalysisList{})
+}
+```
+
+### 生成的 CR 缺少字段
+
+缺少 `DeepCopyInto`
+
+增加
+```
+// +kubebuilder:resource:shortName=analysis
+```
+
+完整的如下：
+```go
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName=analysis
+// +kubebuilder:subresource:status
+
+// Analysis is the Schema for the analyses API
+type Analysis struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   AnalysisSpec   `json:"spec,omitempty"`
+	Status AnalysisStatus `json:"status,omitempty"`
+}
+```
+
+
+

@@ -15,6 +15,7 @@ package v1alpha1
 
 import (
 	restful "github.com/emicklei/go-restful"
+	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
 	"kubesphere.io/schedule/pkg/client/clientset/versioned"
 	scheduleoptions "kubesphere.io/schedule/pkg/client/schedule"
 	"kubesphere.io/schedule/pkg/informers"
@@ -25,9 +26,9 @@ type scheduleHandler struct {
 	schedule schedule.Interface
 }
 
-func NewScheduleClient(ksInformers informers.InformerFactory, ksClient versioned.Interface, option *scheduleoptions.Options, stopCh <-chan struct{}) schedule.Interface {
+func NewScheduleClient(ksInformers informers.InformerFactory, ksClient versioned.Interface, resources ext.Interface, option *scheduleoptions.Options, stopCh <-chan struct{}) schedule.Interface {
 
-	return schedule.NewScheduleOperator(ksInformers, ksClient, stopCh)
+	return schedule.NewScheduleOperator(ksInformers, ksClient, resources, stopCh)
 }
 
 func (h *scheduleHandler) CreateRepo(req *restful.Request, resp *restful.Response) {

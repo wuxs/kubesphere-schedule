@@ -13,6 +13,8 @@ spec:
     kind: Analysis
     listKind: AnalysisList
     plural: analyses
+    shortNames:
+    - analysis
     singular: analysis
   scope: Namespaced
   versions:
@@ -55,8 +57,7 @@ spec:
                     type: integer
                 type: object
               resourceSelectors:
-                description: ResourceSelector indicates how to select resources(e.g.
-                  a set of Deployments) for an Analytics.
+                description: Target what the analysis is for.
                 items:
                   description: ResourceSelector describes how the resources will be
                     selected.
@@ -121,8 +122,9 @@ spec:
                   - kind
                   type: object
                 type: array
-            required:
-            - resourceSelectors
+              type:
+                description: Kind of the resource, e.g. Deployment
+                type: string
             type: object
           status:
             description: AnalysisStatus defines the observed state of Analysis

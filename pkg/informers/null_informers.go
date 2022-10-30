@@ -17,6 +17,7 @@ limitations under the License.
 package informers
 
 import (
+	extinformers "github.com/gocrane/api/pkg/generated/informers/externalversions"
 	"time"
 
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
@@ -54,6 +55,10 @@ func (n nullInformerFactory) KubeSphereSharedInformerFactory() ksinformers.Share
 }
 
 func (n nullInformerFactory) ApiExtensionSharedInformerFactory() apiextensionsinformers.SharedInformerFactory {
+	return nil
+}
+
+func (n nullInformerFactory) ExtensionSharedInformerFactory() extinformers.SharedInformerFactory {
 	return nil
 }
 

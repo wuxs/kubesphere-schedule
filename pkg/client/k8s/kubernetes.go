@@ -18,6 +18,7 @@ package k8s
 
 import (
 	"errors"
+	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
@@ -30,6 +31,7 @@ type Client interface {
 	Kubernetes() kubernetes.Interface
 	KubeSphere() kubesphere.Interface
 	ApiExtensions() apiextensionsclient.Interface
+	ExtResources() ext.Interface
 	Discovery() discovery.DiscoveryInterface
 	Master() string
 	Config() *rest.Config
@@ -44,6 +46,7 @@ type kubernetesClient struct {
 	// generated clientset
 	ks            kubesphere.Interface
 	apiextensions apiextensionsclient.Interface
+	ext           ext.Interface
 	master        string
 	config        *rest.Config
 }
@@ -68,6 +71,10 @@ func NewKubernetesClientWithConfig(config *rest.Config) (client Client, err erro
 	}
 
 	if k.apiextensions, err = apiextensionsclient.NewForConfig(config); err != nil {
+		return
+	}
+
+	if k.ext, err = ext.NewForConfig(config); err != nil {
 		return
 	}
 
@@ -124,6 +131,10 @@ func (k *kubernetesClient) Discovery() discovery.DiscoveryInterface {
 
 func (k *kubernetesClient) ApiExtensions() apiextensionsclient.Interface {
 	return k.apiextensions
+}
+
+func (k *kubernetesClient) ExtResources() ext.Interface {
+	return k.ext
 }
 
 // Master address used to generate kubeconfig for downloading

@@ -19,6 +19,8 @@ package app
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
+	"kubesphere.io/schedule/api/schedule/v1alpha1"
+	"kubesphere.io/schedule/pkg/models/schedule"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -30,17 +32,7 @@ import (
 )
 
 var allControllers = []string{
-
-	"helmrepo",
-	"helmcategory",
-	"helmapplication",
-	"helmapplicationversion",
-	"helmrelease",
-	// "helm",
-
-	// "application",
-	// "serviceaccount",
-	// "resourcequota",
+	"analysis",
 }
 
 // setup all available controllers one by one
@@ -61,16 +53,19 @@ func addAllControllers(mgr manager.Manager, client k8s.Client, informerFactory i
 	// begin init controller and add to manager one by one
 	////////////////////////////////////////////////////////
 
-	analysisReconciler := &analysis.AnalysisReconciler{}
-	addControllerWithSetup(mgr, "analysis", analysisReconciler)
-
 	// "analysis" controller
-	// if cmOptions.IsControllerEnabled("analysis") {
-	// 	if !cmOptions.GatewayOptions.IsEmpty() {
-	// 		analysisReconciler := &analysis.AnalysisReconciler{GatewayOptions: cmOptions.GatewayOptions}
-	// 		addControllerWithSetup(mgr, "analysis", analysisReconciler)
-	// 	}
-	// }
+	// if cmOptions.IsControllerEnabled("analysis") && !cmOptions.GatewayOptions.IsEmpty(){
+
+	scheduleClient := schedule.NewScheduleOperator(informerFactory, client.KubeSphere(), client.ExtResources(), stopCh)
+	analysisReconciler := &analysis.AnalysisReconciler{
+		Client:             mgr.GetClient(),
+		K8SClient:          client,
+		ScheduleClient:     scheduleClient,
+		DeploymentInformer: informerFactory.KubernetesSharedInformerFactory().Apps().V1().Deployments(),
+		NamespaceInformer:  informerFactory.KubernetesSharedInformerFactory().Core().V1().Namespaces(),
+		NameSpaceCache:     make(map[string]*v1alpha1.Analysis),
+	}
+	addControllerWithSetup(mgr, "analysis", analysisReconciler)
 
 	// log all controllers process result
 	for _, name := range allControllers {

@@ -17,6 +17,7 @@ limitations under the License.
 package k8s
 
 import (
+	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
@@ -34,6 +35,7 @@ type FakeClient struct {
 	ApiExtensionClient apiextensionsclient.Interface
 	MasterURL          string
 	KubeConfig         *rest.Config
+	ExtResourceClient  ext.Interface
 
 	ksClient versioned.Interface
 }
@@ -61,6 +63,10 @@ func (n *FakeClient) Kubernetes() kubernetes.Interface {
 
 func (n *FakeClient) ApiExtensions() apiextensionsclient.Interface {
 	return n.ApiExtensionClient
+}
+
+func (n *FakeClient) ExtResources() ext.Interface {
+	return n.ExtResourceClient
 }
 
 func (n *FakeClient) Discovery() discovery.DiscoveryInterface {

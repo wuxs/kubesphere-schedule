@@ -27,12 +27,6 @@ echo "++${SCRIPT_ROOT}++"
 echo "++${CODEGEN_PKG}++"
 
 
-echo bash "${CODEGEN_PKG}"/generate-groups.sh "all" \
-       kubesphere.io/schedule/pkg/generated kubesphere.io/schedule/api \
-       schedule:v1alpha1 \
-       --output-base "${SCRIPT_ROOT}/hack/tmp" \
-       --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt
-
 
 # generate the code with:
 # --output-base    because this script should also be able to run inside the vendor dir of
@@ -47,6 +41,24 @@ bash "${CODEGEN_PKG}"/generate-groups.sh "all" \
 # To use your own boilerplate text append:
 #   --go-header-file "${SCRIPT_ROOT}"/hack/custom-boilerplate.go.txt
 
-#\cp -rf "${SCRIPT_ROOT}"/hack/tmp/kubesphere.io/schedule/api "${SCRIPT_ROOT}"/
+\cp -rf "${SCRIPT_ROOT}"/hack/tmp/kubesphere.io/schedule/api "${SCRIPT_ROOT}"/
 \cp -rf "${SCRIPT_ROOT}"/hack/tmp/kubesphere.io/schedule/pkg/client "${SCRIPT_ROOT}"/pkg
 \rm -rf "${SCRIPT_ROOT}"/hack/tmp
+
+
+# generate the code with:
+# --output-base    because this script should also be able to run inside the vendor dir of
+#                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
+#                  instead of the $GOPATH directly. For normal projects this can be dropped.
+#
+#ECHO "-----------------------------------"
+#
+#bash "${CODEGEN_PKG}"/generate-groups.sh "all" \
+#  kubesphere.io/schedule/pkg/external kubesphere.io/schedule/external/crane \
+#  analysis:v1alpha1 \
+#  --output-base "${SCRIPT_ROOT}/hack/tmp" \
+#  --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt \
+#  -v 8
+#
+#\cp -rf "${SCRIPT_ROOT}"/hack/tmp/kubesphere.io/schedule/pkg/external "${SCRIPT_ROOT}"/pkg
+#\rm -rf "${SCRIPT_ROOT}"/hack/tmp

@@ -16,9 +16,7 @@ limitations under the License.
 
 package apis
 
-import (
-	"kubesphere.io/schedule/external/crane/analysis/v1alpha1"
-)
+import "github.com/gocrane/api/analysis/v1alpha1"
 
 func init() {
 	AddToSchemes = append(AddToSchemes, v1alpha1.SchemeBuilder.AddToScheme)

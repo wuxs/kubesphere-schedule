@@ -17,6 +17,8 @@ limitations under the License.
 package informers
 
 import (
+	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
+	extinformers "github.com/gocrane/api/pkg/generated/informers/externalversions"
 	"reflect"
 	"time"
 
@@ -37,8 +39,8 @@ const defaultResync = 600 * time.Second
 type InformerFactory interface {
 	KubernetesSharedInformerFactory() k8sinformers.SharedInformerFactory
 	KubeSphereSharedInformerFactory() ksinformers.SharedInformerFactory
+	ExtensionSharedInformerFactory() extinformers.SharedInformerFactory
 	ApiExtensionSharedInformerFactory() apiextensionsinformers.SharedInformerFactory
-
 	// Start shared informer factory one by one if they are not nil
 	Start(stopCh <-chan struct{})
 }
@@ -52,9 +54,10 @@ type informerFactories struct {
 	informerFactory              k8sinformers.SharedInformerFactory
 	ksInformerFactory            ksinformers.SharedInformerFactory
 	apiextensionsInformerFactory apiextensionsinformers.SharedInformerFactory
+	extensionsInformerFactory    extinformers.SharedInformerFactory
 }
 
-func NewInformerFactories(client kubernetes.Interface, ksClient versioned.Interface,
+func NewInformerFactories(client kubernetes.Interface, ksClient versioned.Interface, extClient ext.Interface,
 	apiextensionsClient apiextensionsclient.Interface) InformerFactory {
 	factory := &informerFactories{}
 
@@ -68,6 +71,10 @@ func NewInformerFactories(client kubernetes.Interface, ksClient versioned.Interf
 
 	if apiextensionsClient != nil {
 		factory.apiextensionsInformerFactory = apiextensionsinformers.NewSharedInformerFactory(apiextensionsClient, defaultResync)
+	}
+
+	if client != nil {
+		factory.extensionsInformerFactory = extinformers.NewSharedInformerFactory(extClient, defaultResync)
 	}
 
 	return factory
@@ -85,6 +92,10 @@ func (f *informerFactories) ApiExtensionSharedInformerFactory() apiextensionsinf
 	return f.apiextensionsInformerFactory
 }
 
+func (f *informerFactories) ExtensionSharedInformerFactory() extinformers.SharedInformerFactory {
+	return f.extensionsInformerFactory
+}
+
 func (f *informerFactories) Start(stopCh <-chan struct{}) {
 	if f.informerFactory != nil {
 		f.informerFactory.Start(stopCh)
@@ -96,6 +107,10 @@ func (f *informerFactories) Start(stopCh <-chan struct{}) {
 
 	if f.apiextensionsInformerFactory != nil {
 		f.apiextensionsInformerFactory.Start(stopCh)
+	}
+
+	if f.extensionsInformerFactory != nil {
+		f.extensionsInformerFactory.Start(stopCh)
 	}
 
 }

@@ -158,7 +158,7 @@ func (s *APIServer) buildHandlerChain(stopCh <-chan struct{}) {
 
 type informerForResourceFunc func(resource schema.GroupVersionResource) (interface{}, error)
 
-func waitForCacheSync(discoveryClient discovery.DiscoveryInterface, sharedInformerFactory informers.GenericInformerFactory, informerForResourceFunc informerForResourceFunc, GVRs map[schema.GroupVersion][]string, stopCh <-chan struct{}) error {
+func WaitForCacheSync(discoveryClient discovery.DiscoveryInterface, sharedInformerFactory informers.GenericInformerFactory, informerForResourceFunc informerForResourceFunc, GVRs map[schema.GroupVersion][]string, stopCh <-chan struct{}) error {
 	for groupVersion, resourceNames := range GVRs {
 		var apiResourceList *v1.APIResourceList
 		var err error
@@ -215,7 +215,7 @@ func (s *APIServer) waitForResourceSync(ctx context.Context) error {
 		},
 	}
 
-	if err := waitForCacheSync(s.KubernetesClient.Kubernetes().Discovery(),
+	if err := WaitForCacheSync(s.KubernetesClient.Kubernetes().Discovery(),
 		s.InformerFactory.KubeSphereSharedInformerFactory(),
 		func(resource schema.GroupVersionResource) (interface{}, error) {
 			return s.InformerFactory.KubeSphereSharedInformerFactory().ForResource(resource)
