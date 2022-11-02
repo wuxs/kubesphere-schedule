@@ -20,11 +20,13 @@ import (
 	"fmt"
 	appsv1 "k8s.io/api/apps/v1"
 	schedulev1alpha1 "kubesphere.io/schedule/api/schedule/v1alpha1"
+	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"strings"
 )
 
 func NotNil(obj interface{}, msgs ...string) error {
-	if obj != nil {
+	if !IsNil(obj) {
 		return nil
 	}
 	if len(msgs) > 0 {
@@ -35,6 +37,18 @@ func NotNil(obj interface{}, msgs ...string) error {
 	}
 	return fmt.Errorf("[%v] is nil", obj)
 }
+func IsNil(v interface{}) bool {
+	valueOf := reflect.ValueOf(v)
+
+	k := valueOf.Kind()
+
+	switch k {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
+		return valueOf.IsNil()
+	default:
+		return v == nil
+	}
+}
 
 func convertResource(deployment *appsv1.Deployment) schedulev1alpha1.ResourceSelector {
 	gv := appsv1.SchemeGroupVersion
@@ -44,3 +58,5 @@ func convertResource(deployment *appsv1.Deployment) schedulev1alpha1.ResourceSel
 		Name:       deployment.Name,
 	}
 }
+
+var getQKV = apiutil.GVKForObject

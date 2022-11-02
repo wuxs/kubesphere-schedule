@@ -6,22 +6,22 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.6.2
   creationTimestamp: null
-  name: analyses.schedule.kubesphere.io
+  name: analysistasks.schedule.kubesphere.io
 spec:
   group: schedule.kubesphere.io
   names:
-    kind: Analysis
-    listKind: AnalysisList
-    plural: analyses
+    kind: AnalysisTask
+    listKind: AnalysisTaskList
+    plural: analysistasks
     shortNames:
     - analysis
-    singular: analysis
+    singular: analysistask
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Analysis is the Schema for the analyses API
+        description: AnalysisTask is the Schema for the schedule API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation

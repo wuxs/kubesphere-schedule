@@ -32,59 +32,59 @@ import (
 	v1alpha1 "kubesphere.io/schedule/pkg/client/listers/schedule/v1alpha1"
 )
 
-// AnalysisInformer provides access to a shared informer and lister for
-// Analysises.
-type AnalysisInformer interface {
+// AnalysisTaskInformer provides access to a shared informer and lister for
+// AnalysisTasks.
+type AnalysisTaskInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.AnalysisLister
+	Lister() v1alpha1.AnalysisTaskLister
 }
 
-type analysisInformer struct {
+type analysisTaskInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewAnalysisInformer constructs a new informer for Analysis type.
+// NewAnalysisTaskInformer constructs a new informer for AnalysisTask type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewAnalysisInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredAnalysisInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewAnalysisTaskInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredAnalysisTaskInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredAnalysisInformer constructs a new informer for Analysis type.
+// NewFilteredAnalysisTaskInformer constructs a new informer for AnalysisTask type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredAnalysisInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredAnalysisTaskInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ScheduleV1alpha1().Analysises(namespace).List(context.TODO(), options)
+				return client.ScheduleV1alpha1().AnalysisTasks(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ScheduleV1alpha1().Analysises(namespace).Watch(context.TODO(), options)
+				return client.ScheduleV1alpha1().AnalysisTasks(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&schedulev1alpha1.Analysis{},
+		&schedulev1alpha1.AnalysisTask{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *analysisInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredAnalysisInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *analysisTaskInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredAnalysisTaskInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *analysisInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&schedulev1alpha1.Analysis{}, f.defaultInformer)
+func (f *analysisTaskInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&schedulev1alpha1.AnalysisTask{}, f.defaultInformer)
 }
 
-func (f *analysisInformer) Lister() v1alpha1.AnalysisLister {
-	return v1alpha1.NewAnalysisLister(f.Informer().GetIndexer())
+func (f *analysisTaskInformer) Lister() v1alpha1.AnalysisTaskLister {
+	return v1alpha1.NewAnalysisTaskLister(f.Informer().GetIndexer())
 }

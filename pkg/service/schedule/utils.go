@@ -264,10 +264,10 @@ import (
 //		Name:      rls.Spec.ChartName,
 //	}
 //
-//	app.ReleaseInfo = make([]runtime.Object, 0, len(rlsInfos))
+//	app.ReleaseInfo = make([]runtime.Result, 0, len(rlsInfos))
 //	if rlsInfos != nil {
 //		for _, info := range rlsInfos {
-//			app.ReleaseInfo = append(app.ReleaseInfo, info.Object)
+//			app.ReleaseInfo = append(app.ReleaseInfo, info.Result)
 //		}
 //	}
 //

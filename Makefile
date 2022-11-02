@@ -3,14 +3,14 @@ COMMIT := $(shell git rev-parse --short HEAD)
 VERSION := dev-$(shell git describe --tags $(shell git rev-list --tags --max-count=1))
 
 DOCKER_REPO ?= kubespheredev
-CONTROLLER_IMG ?= ${DOCKER_REPO}/devops-controller:$(VERSION)-$(COMMIT)
-APISERVER_IMG ?= ${DOCKER_REPO}/devops-apiserver:$(VERSION)-$(COMMIT)
-TOOLS_IMG ?= ${DOCKER_REPO}/devops-tools:$(VERSION)-$(COMMIT)
+CONTROLLER_IMG ?= ${DOCKER_REPO}/sechdule-controller:$(VERSION)-$(COMMIT)
+APISERVER_IMG ?= ${DOCKER_REPO}/sechdule-apiserver:$(VERSION)-$(COMMIT)
+TOOLS_IMG ?= ${DOCKER_REPO}/sechdule-tools:$(VERSION)-$(COMMIT)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 CONTAINER_CLI?=docker
 
-GV="devops.kubesphere.io:v1alpha1 devops.kubesphere.io:v1alpha3 gitops.kubesphere.io:v1alpha1"
+GV="sechdule.kubesphere.io:v1alpha1"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -76,11 +76,11 @@ generate: controller-gen
 clientset:
 	./hack/generate_client.sh ${GV}
 
-openapi:
-	openapi-gen -O openapi_generated -i ./api/v1alpha1 -p kubesphere.io/api/devops/v1alpha1 -h ./hack/boilerplate.go.txt --report-filename ./api/violation_exceptions.list
+openapi: openapi-gen
+	openapi-gen -O openapi_generated -i ./api/v1alpha1 -p kubesphere.io/api/sechdule/v1alpha1 -h ./hack/boilerplate.go.txt --report-filename ./api/violation_exceptions.list
 
 generate-listers:
-	lister-gen -v=2 --output-base=. --input-dirs kubesphere.io/devops/pkg/api/devops/v1alpha3,kubesphere.io/devops/pkg/api/devops/v1alpha1  \
+	lister-gen -v=2 --output-base=. --input-dirs kubesphere.io/sechdule/pkg/api/sechdule/v1alpha1  \
  		--output-package pkg/client/listers -h hack/boilerplate.go.txt
 
 # Build the docker image of controller-manager
@@ -161,6 +161,25 @@ CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
+
+
+# find or download openapi-gen
+# download openapi-gen if necessary
+openapi-gen:
+ifeq (, $(shell which openapi-gen))
+	@{ \
+	set -e ;\
+	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
+	cd $$CONTROLLER_GEN_TMP_DIR ;\
+	go mod init tmp ;\
+	go install k8s.io/kube-openapi/cmd/openapi-gen ;\
+	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
+	}
+CONTROLLER_GEN=$(GOBIN)/openapi-gen
+else
+CONTROLLER_GEN=$(shell which openapi-gen)
+endif
+
 
 # find or download kustomize
 # download kustomize if necessary

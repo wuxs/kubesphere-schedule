@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package models
+package service
 
 type PageableResponse struct {
 	Items      []interface{} `json:"items" description:"paging data"`

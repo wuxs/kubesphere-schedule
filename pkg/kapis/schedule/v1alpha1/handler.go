@@ -14,123 +14,174 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	restful "github.com/emicklei/go-restful"
 	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
+	"kubesphere.io/schedule/api"
+	"kubesphere.io/schedule/api/schedule/v1alpha1"
+	"kubesphere.io/schedule/pkg/apiserver/query"
 	"kubesphere.io/schedule/pkg/client/clientset/versioned"
 	scheduleoptions "kubesphere.io/schedule/pkg/client/schedule"
+	"kubesphere.io/schedule/pkg/constants"
 	"kubesphere.io/schedule/pkg/informers"
-	"kubesphere.io/schedule/pkg/models/schedule"
+	"kubesphere.io/schedule/pkg/kapis"
+	"kubesphere.io/schedule/pkg/service/model"
+	"kubesphere.io/schedule/pkg/service/schedule"
+)
+
+var (
+	ErrScheduleClientNil = fmt.Errorf("schedule client is nil")
+	ErrScheduleTypeNil   = fmt.Errorf("analysis task type error")
 )
 
 type scheduleHandler struct {
-	schedule schedule.Interface
+	schedule schedule.Operator
 }
 
-func NewScheduleClient(ksInformers informers.InformerFactory, ksClient versioned.Interface, resources ext.Interface, option *scheduleoptions.Options, stopCh <-chan struct{}) schedule.Interface {
+func NewScheduleClient(ksInformers informers.InformerFactory,
+	k8sClient kubernetes.Interface,
+	scheduleClient versioned.Interface,
+	resourcesClient ext.Interface,
+	dynamicClient dynamic.Interface, option *scheduleoptions.Options, stopCh <-chan struct{}) schedule.Operator {
 
-	return schedule.NewScheduleOperator(ksInformers, ksClient, resources, stopCh)
+	return schedule.NewScheduleOperator(ksInformers,
+		k8sClient,
+		scheduleClient,
+		resourcesClient,
+		dynamicClient, stopCh)
 }
 
-func (h *scheduleHandler) CreateRepo(req *restful.Request, resp *restful.Response) {
+func (h *scheduleHandler) ListScheduler(request *restful.Request, response *restful.Response) {
+	//TODO implement me
+	panic("implement me")
+}
 
-	//createRepoRequest := &schedule.CreateRepoRequest{}
-	//err := req.ReadEntity(createRepoRequest)
-	//if err != nil {
-	//	klog.V(4).Infoln(err)
-	//	api.HandleBadRequest(resp, nil, err)
-	//	return
-	//}
-	//
-	//createRepoRequest.Workspace = new(string)
-	//*createRepoRequest.Workspace = req.PathParameter("workspace")
-	//
-	//user, _ := request.UserFrom(req.Request.Context())
-	//creator := ""
-	//if user != nil {
-	//	creator = user.GetName()
-	//}
-	//parsedUrl, err := url.Parse(createRepoRequest.URL)
-	//if err != nil {
-	//	api.HandleBadRequest(resp, nil, err)
-	//	return
-	//}
-	//userInfo := parsedUrl.User
-	//// trim credential from url
-	//parsedUrl.User = nil
-	//
-	//syncPeriod := 0
-	//// If SyncPeriod is empty, ignore it.
-	//if createRepoRequest.SyncPeriod != "" {
-	//	duration, err := time.ParseDuration(createRepoRequest.SyncPeriod)
-	//	if err != nil {
-	//		api.HandleBadRequest(resp, nil, err)
-	//		return
-	//	} else if duration > 0 {
-	//		syncPeriod = int(math.Max(float64(duration/time.Second), constants.HelmRepoMinSyncPeriod))
-	//	}
-	//}
-	//
-	//repo := v1alpha1.HelmRepo{
-	//	ObjectMeta: metav1.ObjectMeta{
-	//		Name: idutils.GetUuid36(v1alpha1.HelmRepoIdPrefix),
-	//		Annotations: map[string]string{
-	//			constants.CreatorAnnotationKey: creator,
-	//		},
-	//		Labels: map[string]string{
-	//			constants.WorkspaceLabelKey: *createRepoRequest.Workspace,
-	//		},
-	//	},
-	//	Spec: v1alpha1.HelmRepoSpec{
-	//		Name:        createRepoRequest.Name,
-	//		Url:         parsedUrl.String(),
-	//		SyncPeriod:  syncPeriod,
-	//		Description: stringutils.ShortenString(createRepoRequest.Description, 512),
-	//	},
-	//}
-	//
-	//if syncPeriod > 0 {
-	//	repo.Annotations[v1alpha1.RepoSyncPeriod] = createRepoRequest.SyncPeriod
-	//}
-	//
-	//if strings.HasPrefix(createRepoRequest.URL, "https://") || strings.HasPrefix(createRepoRequest.URL, "http://") {
-	//	if userInfo != nil {
-	//		repo.Spec.Credential.Username = userInfo.Username()
-	//		repo.Spec.Credential.Password, _ = userInfo.Password()
-	//	}
-	//} else if strings.HasPrefix(createRepoRequest.URL, "s3://") {
-	//	cfg := v1alpha1.S3Config{}
-	//	err := json.Unmarshal([]byte(createRepoRequest.Credential), &cfg)
-	//	if err != nil {
-	//		api.HandleBadRequest(resp, nil, err)
-	//		return
-	//	}
-	//	repo.Spec.Credential.S3Config = cfg
-	//}
-	//
-	//var result interface{}
-	//// 1. validate repo
-	//result, err = h.schedule.ValidateRepo(createRepoRequest.URL, &repo.Spec.Credential)
-	//if err != nil {
-	//	klog.Errorf("validate repo failed, err: %s", err)
-	//	api.HandleBadRequest(resp, nil, err)
-	//	return
-	//}
-	//
-	//// 2. create repo
-	//validate, _ := strconv.ParseBool(req.QueryParameter("validate"))
-	//if !validate {
-	//	if repo.GetTrueName() == "" {
-	//		api.HandleBadRequest(resp, nil, fmt.Errorf("repo name is empty"))
-	//		return
-	//	}
-	//	result, err = h.schedule.CreateRepo(&repo)
-	//}
-	//
-	//if err != nil {
-	//	klog.Errorln(err)
-	//	handleScheduleError(resp, err)
-	//	return
-	//}
-	//
-	//resp.WriteEntity(result)
+func (h *scheduleHandler) ModifyScheduler(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	namespaceID := request.PathParameter("namespace")
+	var analysisTask *v1alpha1.AnalysisTask
+	err := request.ReadEntity(&analysisTask)
+	if err != nil {
+		klog.V(4).Infoln(err)
+		api.HandleBadRequest(response, nil, err)
+		return
+	}
+
+	if analysisTask.Spec.Type != v1alpha1.ResourceTypeDeployment {
+		klog.V(4).Infoln(ErrScheduleTypeNil)
+		api.HandleBadRequest(response, nil, ErrScheduleTypeNil)
+		return
+	}
+
+	Result(h.schedule.CreateAnalysisTask(ctx, namespaceID, analysisTask)).
+		Output(request, response, "create deployment analysis task %s", analysisTask.Name)
+}
+func (h *scheduleHandler) ListAnalysisTask(request *restful.Request, response *restful.Response) {
+	//analysis := request.PathParameter("analysis")
+	ctx := request.Request.Context()
+	query := query.ParseQueryParameter(request)
+	if h.Ready(request, response) {
+		objs, err := h.schedule.ListAnalysisTask(ctx, query)
+		kapis.ErrorHandle(request, response, objs, err)
+	}
+}
+
+func (h *scheduleHandler) CreateAnalysis(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	namespaceID := request.PathParameter("namespace")
+	var analysisTask *v1alpha1.AnalysisTask
+	err := request.ReadEntity(&analysisTask)
+	if err != nil {
+		klog.V(4).Infoln(err)
+		api.HandleBadRequest(response, nil, err)
+		return
+	}
+
+	if analysisTask.Spec.Type != v1alpha1.ResourceTypeDeployment {
+		klog.V(4).Infoln(ErrScheduleTypeNil)
+		api.HandleBadRequest(response, nil, ErrScheduleTypeNil)
+		return
+	}
+
+	Result(h.schedule.CreateAnalysisTask(ctx, namespaceID, analysisTask)).
+		Output(request, response, "create deployment analysis task %s", analysisTask.Name)
+}
+
+func (h *scheduleHandler) CreateNamespaceAnalysis(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	var analysisTask *v1alpha1.AnalysisTask
+	err := request.ReadEntity(&analysisTask)
+	if err != nil {
+		klog.V(4).Infoln(err)
+		api.HandleBadRequest(response, nil, err)
+		return
+	}
+
+	if analysisTask.Spec.Type != v1alpha1.ResourceTypeNamespace {
+		klog.V(4).Infoln(ErrScheduleTypeNil)
+		api.HandleBadRequest(response, nil, ErrScheduleTypeNil)
+		return
+	}
+
+	Result(h.schedule.CreateAnalysisTask(ctx, constants.KubesphereScheduleNamespace, analysisTask)).
+		Output(request, response, "create deployment analysis task %s", analysisTask.Name)
+}
+
+func (h *scheduleHandler) ModifyAnalysisTask(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	analysisID := request.PathParameter("analysis")
+	namespaceID := request.PathParameter("namespace")
+	var analysisTask *v1alpha1.AnalysisTask
+	err := request.ReadEntity(&analysisTask)
+	if err != nil {
+		klog.V(4).Infoln(err)
+		api.HandleBadRequest(response, nil, err)
+		return
+	}
+
+	Result(h.schedule.ModifyAnalysisTask(ctx, namespaceID, analysisID, analysisTask)).
+		Output(request, response, "modify analysis task: ", analysisID)
+}
+
+func (h *scheduleHandler) DescribeAnalysisTask(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	analysisID := request.PathParameter("analysis")
+	namespaceID := request.PathParameter("namespace")
+
+	Result(h.schedule.DescribeAnalysisTask(ctx, namespaceID, analysisID)).
+		Output(request, response, "describe analysis task: ", analysisID)
+}
+
+func (h *scheduleHandler) DeleteAnalysisTask(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	analysisID := request.PathParameter("analysis")
+	namespace := request.PathParameter("namespace")
+
+	Result(h.schedule.DeleteAnalysisTask(ctx, namespace, analysisID)).
+		Output(request, response, "delete analysis task: ", analysisID)
+}
+
+func (h *scheduleHandler) ModifyAnalysisTaskConfig(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	var analysisConfig *model.SchedulerConfig
+	err := request.ReadEntity(&analysisConfig)
+	if err != nil {
+		klog.V(4).Infoln(err)
+		api.HandleBadRequest(response, nil, err)
+		return
+	}
+
+	Result(h.schedule.ModifyAnalysisTaskConfig(ctx, analysisConfig)).
+		Output(request, response, "modify analysis task config: ", analysisConfig)
+}
+
+func (h *scheduleHandler) Ready(request *restful.Request, response *restful.Response) bool {
+	if h.schedule != nil {
+		return true
+	}
+	kapis.HandleBadRequest(response, request, ErrScheduleClientNil)
+	return false
 }

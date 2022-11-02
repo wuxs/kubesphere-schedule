@@ -1,0 +1,235 @@
+
+# 提交 deployments
+# curl 'http://preview.thingsdao.com:30888/apis/apps/v1/namespaces/kubeedge/deployments?dryRun=All'
+#  -H 'Accept: */*'
+#  -H 'Accept-Language: zh-CN,zh;q=0.9'
+#  -H 'Connection: keep-alive'
+#  -H 'Cookie: lang=zh; oAuthLoginInfo=; token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NjcxOTk0MzksImlhdCI6MTY2NzE5MjIzOSwiaXNzIjoia3ViZXNwaGVyZSIsInN1YiI6ImFkbWluIiwidG9rZW5fdHlwZSI6ImFjY2Vzc190b2tlbiIsInVzZXJuYW1lIjoiYWRtaW4ifQ.uFUAt19w2FDjnnr00eN4sUlshEZoqM1ygcXc7__-hNo; expire=1667199439271; refreshToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NjcyMDY2MzksImlhdCI6MTY2NzE5MjIzOSwiaXNzIjoia3ViZXNwaGVyZSIsInN1YiI6ImFkbWluIiwidG9rZW5fdHlwZSI6InJlZnJlc2hfdG9rZW4iLCJ1c2VybmFtZSI6ImFkbWluIn0.cWUgh_K2JuWBjefAAHnsX-HFwVbh17cItazBsPkxkR8'
+#  -H 'Origin: http://preview.thingsdao.com:30888'
+#  -H 'Referer: http://preview.thingsdao.com:30888/clusters/default/deployments?namespace=kubeedge'
+#  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36'
+#  -H 'content-type: application/json'
+#  --data-raw '{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"namespace":"kubeedge","labels":{"app":"abcd-111"},"name":"abcd-111","annotations":{"kubesphere.io/alias-name":"哈哈哈哈哈","kubesphere.io/description":"描述描述描述描述描述描述描述描述描述描述描述描述描述描述","kubesphere.io/creator":"admin"}},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"abcd-111"}},"template":{"metadata":{"labels":{"app":"abcd-111"}},"spec":{"containers":[{"name":"nginx-wqix8q","imagePullPolicy":"IfNotPresent","image":"nginx","ports":[{"name":"tcp-80","protocol":"TCP","containerPort":80}],"resources":{"requests":{"cpu":"0.25","memory":"100Mi"},"limits":{"cpu":"2.3","memory":"580Mi"}}}],"serviceAccount":"default","initContainers":[],"volumes":[],"imagePullSecrets":null}},"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":"25%","maxSurge":"25%"}}}}'
+#  --compressed
+POST http://preview.thingsdao.com:30888/apis/apps/v1/namespaces/kubeedge/deployments?dryRun=All
+Accept: */*
+Accept-Language: zh-CN,zh;q=0.9
+Connection: keep-alive
+Cookie: lang=zh; oAuthLoginInfo=; token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NjcxOTk0MzksImlhdCI6MTY2NzE5MjIzOSwiaXNzIjoia3ViZXNwaGVyZSIsInN1YiI6ImFkbWluIiwidG9rZW5fdHlwZSI6ImFjY2Vzc190b2tlbiIsInVzZXJuYW1lIjoiYWRtaW4ifQ.uFUAt19w2FDjnnr00eN4sUlshEZoqM1ygcXc7__-hNo; expire=1667199439271; refreshToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NjcyMDY2MzksImlhdCI6MTY2NzE5MjIzOSwiaXNzIjoia3ViZXNwaGVyZSIsInN1YiI6ImFkbWluIiwidG9rZW5fdHlwZSI6InJlZnJlc2hfdG9rZW4iLCJ1c2VybmFtZSI6ImFkbWluIn0.cWUgh_K2JuWBjefAAHnsX-HFwVbh17cItazBsPkxkR8
+Origin: http://preview.thingsdao.com:30888
+Referer: http://preview.thingsdao.com:30888/clusters/default/deployments?namespace=kubeedge
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36
+Content-Type: application/json
+
+{
+  "apiVersion": "apps/v1",
+  "kind": "Deployment",
+  "metadata": {
+    "namespace": "kubeedge",
+    "labels": {
+      "app": "abcd-111"
+    },
+    "name": "abcd-111",
+    "annotations": {
+      "kubesphere.io/alias-name": "哈哈哈哈哈",
+      "kubesphere.io/description": "描述描述描述描述描述描述描述描述描述描述描述描述描述描述",
+      "kubesphere.io/creator": "admin"
+    }
+  },
+  "spec": {
+    "replicas": 1,
+    "selector": {
+      "matchLabels": {
+        "app": "abcd-111"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "abcd-111"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "nginx-wqix8q",
+            "imagePullPolicy": "IfNotPresent",
+            "image": "nginx",
+            "ports": [
+              {
+                "name": "tcp-80",
+                "protocol": "TCP",
+                "containerPort": 80
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "0.25",
+                "memory": "100Mi"
+              },
+              "limits": {
+                "cpu": "2.3",
+                "memory": "580Mi"
+              }
+            }
+          }
+        ],
+        "serviceAccount": "default",
+        "initContainers": [],
+        "volumes": [],
+        "imagePullSecrets": null
+      }
+    },
+    "strategy": {
+      "type": "RollingUpdate",
+      "rollingUpdate": {
+        "maxUnavailable": "25%",
+        "maxSurge": "25%"
+      }
+    }
+  }
+}
+
+###
+
+# 读取 deployments
+# curl 'http://preview.thingsdao.com:30888/apis/apps/v1/namespaces/kubeedge/deployments?labelSelector=app%3Dabcd-111'
+#  -H 'Accept: */*'
+#  -H 'Accept-Language: zh-CN,zh;q=0.9'
+#  -H 'Connection: keep-alive'
+#  -H 'Cookie: lang=zh; oAuthLoginInfo=; token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NjcxOTk0MzksImlhdCI6MTY2NzE5MjIzOSwiaXNzIjoia3ViZXNwaGVyZSIsInN1YiI6ImFkbWluIiwidG9rZW5fdHlwZSI6ImFjY2Vzc190b2tlbiIsInVzZXJuYW1lIjoiYWRtaW4ifQ.uFUAt19w2FDjnnr00eN4sUlshEZoqM1ygcXc7__-hNo; expire=1667199439271; refreshToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NjcyMDY2MzksImlhdCI6MTY2NzE5MjIzOSwiaXNzIjoia3ViZXNwaGVyZSIsInN1YiI6ImFkbWluIiwidG9rZW5fdHlwZSI6InJlZnJlc2hfdG9rZW4iLCJ1c2VybmFtZSI6ImFkbWluIn0.cWUgh_K2JuWBjefAAHnsX-HFwVbh17cItazBsPkxkR8'
+#  -H 'Referer: http://preview.thingsdao.com:30888/clusters/default/deployments?namespace=kubeedge'
+#  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36'
+#  -H 'content-type: application/json'
+#  -H 'x-check-exist: true'
+#  --compressed
+GET http://preview.thingsdao.com:30888/apis/apps/v1/namespaces/kubeedge/deployments?labelSelector=app%3Dabcd-111
+Accept: */*
+Accept-Language: zh-CN,zh;q=0.9
+Connection: keep-alive
+Cookie: lang=zh; oAuthLoginInfo=; token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NjcxOTk0MzksImlhdCI6MTY2NzE5MjIzOSwiaXNzIjoia3ViZXNwaGVyZSIsInN1YiI6ImFkbWluIiwidG9rZW5fdHlwZSI6ImFjY2Vzc190b2tlbiIsInVzZXJuYW1lIjoiYWRtaW4ifQ.uFUAt19w2FDjnnr00eN4sUlshEZoqM1ygcXc7__-hNo; expire=1667199439271; refreshToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NjcyMDY2MzksImlhdCI6MTY2NzE5MjIzOSwiaXNzIjoia3ViZXNwaGVyZSIsInN1YiI6ImFkbWluIiwidG9rZW5fdHlwZSI6InJlZnJlc2hfdG9rZW4iLCJ1c2VybmFtZSI6ImFkbWluIn0.cWUgh_K2JuWBjefAAHnsX-HFwVbh17cItazBsPkxkR8
+Referer: http://preview.thingsdao.com:30888/clusters/default/deployments?namespace=kubeedge
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36
+x-check-exist: true
+Content-Type: application/json
+
+### 列出 analysis
+
+GET 127.0.0.1:9090/kapis/schedule.kubesphere.io/v1/analysis
+
+> {%
+client.test("列出 analysis", function() {
+    client.log("列出 analysis");
+    client.log(response.body.items[0].metadata.name+"-"+response.body.items[0].metadata.namespace+"-"+response.body.items[0].spec.type)
+    client.log(response.body.items[1].metadata.name+"-"+response.body.items[1].metadata.namespace+"-"+response.body.items[1].spec.type)
+    client.log(response.body.items[2].metadata.name+"-"+response.body.items[2].metadata.namespace+"-"+response.body.items[2].spec.type)
+    client.log(response.body.items[3].metadata.name+"-"+response.body.items[3].metadata.namespace+"-"+response.body.items[3].spec.type)
+});
+ %}
+
+###
+DELETE 127.0.0.1:9090/kapis/schedule.kubesphere.io/v1/namespaces/default/analysis/analysis-sample
+Accept: application/json
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+
+###
+POST 127.0.0.1:9090/kapis/schedule.kubesphere.io/v1/analysis
+Accept: application/json
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "apiVersion": "schedule.kubesphere.io/v1alpha1",
+  "kind": "AnalysisTask",
+  "metadata": {
+    "labels": {
+      "app.kubernetes.io/name": "analysis",
+      "app.kubernetes.io/instance": "analysis-sample",
+      "app.kubernetes.io/part-of": "kubesphere-schedule",
+      "app.kuberentes.io/managed-by": "kustomize",
+      "app.kubernetes.io/created-by": "kubesphere-schedule"
+    },
+    "name": "analysis-sample-2"
+  },
+  "spec": {
+    "type": "Namespace",
+    "completionStrategy": {
+      "completionStrategyType": "Periodical",
+      "periodSeconds": 86400
+    },
+    "resourceSelectors": [
+      {
+        "apiVersion": "apps/v1",
+        "kind": "Namespace",
+        "labelSelector": {},
+        "name": "keel-system"
+      },
+      {
+        "apiVersion": "apps/v1",
+        "kind": "Namespace",
+        "labelSelector": {},
+        "name": "dapr-system"
+      }
+    ]
+  }
+}
+
+###
+
+PATCH 127.0.0.1:9090/kapis/schedule.kubesphere.io/v1/namespaces/kubesphere-schedule-system/analysis/analysis-sample-2
+Accept: application/json
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "apiVersion": "schedule.kubesphere.io/v1alpha1",
+  "kind": "AnalysisTask",
+  "metadata": {
+    "labels": {
+      "app.kubernetes.io/name": "analysis",
+      "app.kubernetes.io/instance": "analysis-sample-abcd1234567890",
+      "app.kubernetes.io/part-of": "kubesphere-schedule",
+      "app.kuberentes.io/managed-by": "kustomize",
+      "app.kubernetes.io/created-by": "kubesphere-schedule"
+    },
+    "name": "analysis-sample-2"
+  },
+  "spec": {
+    "type": "Namespace",
+    "completionStrategy": {
+      "completionStrategyType": "Periodical",
+      "periodSeconds": 86400
+    },
+    "resourceSelectors": [
+      {
+        "apiVersion": "apps/v1",
+        "kind": "Namespace",
+        "labelSelector": {},
+        "name": "keel-system"
+      },
+      {
+        "apiVersion": "apps/v1",
+        "kind": "Namespace",
+        "labelSelector": {},
+        "name": "dapr-system"
+      }
+    ]
+  }
+}
+
+###
+PATCH 127.0.0.1:9090/kapis/schedule.kubesphere.io/v1/analysis/config
+Accept: application/json
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "mem_notify_present": 10}
+
+###
+GET 127.0.0.1:9090/apidocs.json
+
+###
+

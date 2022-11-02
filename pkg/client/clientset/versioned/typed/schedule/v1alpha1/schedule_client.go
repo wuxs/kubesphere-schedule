@@ -26,7 +26,7 @@ import (
 
 type ScheduleV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	AnalysisesGetter
+	AnalysisTasksGetter
 }
 
 // ScheduleV1alpha1Client is used to interact with features provided by the schedule.kubesphere.io group.
@@ -34,8 +34,8 @@ type ScheduleV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *ScheduleV1alpha1Client) Analysises(namespace string) AnalysisInterface {
-	return newAnalysises(c, namespace)
+func (c *ScheduleV1alpha1Client) AnalysisTasks(namespace string) AnalysisTaskInterface {
+	return newAnalysisTasks(c, namespace)
 }
 
 // NewForConfig creates a new ScheduleV1alpha1Client for the given config.

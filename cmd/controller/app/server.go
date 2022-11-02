@@ -143,9 +143,10 @@ func run(s *options.KubeSphereControllerManagerOptions, ctx context.Context) err
 
 	informerFactory := informers.NewInformerFactories(
 		kubernetesClient.Kubernetes(),
-		kubernetesClient.KubeSphere(),
+		kubernetesClient.Schedule(),
 		kubernetesClient.ExtResources(),
-		kubernetesClient.ApiExtensions())
+		kubernetesClient.ApiExtensions(),
+		kubernetesClient.Dynamic())
 
 	mgrOptions := manager.Options{
 		CertDir: s.WebhookCertDir,

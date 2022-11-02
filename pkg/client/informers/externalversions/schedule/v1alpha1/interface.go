@@ -24,8 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// Analysises returns a AnalysisInformer.
-	Analysises() AnalysisInformer
+	// AnalysisTasks returns a AnalysisTaskInformer.
+	AnalysisTasks() AnalysisTaskInformer
 }
 
 type version struct {
@@ -39,7 +39,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// Analysises returns a AnalysisInformer.
-func (v *version) Analysises() AnalysisInformer {
-	return &analysisInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+// AnalysisTasks returns a AnalysisTaskInformer.
+func (v *version) AnalysisTasks() AnalysisTaskInformer {
+	return &analysisTaskInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

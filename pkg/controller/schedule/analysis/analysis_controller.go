@@ -22,7 +22,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	urlruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	v1 "k8s.io/client-go/informers/apps/v1"
 	corev1informer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -30,29 +32,34 @@ import (
 	"kubesphere.io/schedule/api/schedule/v1alpha1"
 	schedulev1alpha1 "kubesphere.io/schedule/api/schedule/v1alpha1"
 	"kubesphere.io/schedule/pkg/client/k8s"
-	"kubesphere.io/schedule/pkg/models/schedule"
+	"kubesphere.io/schedule/pkg/service/model"
+	"kubesphere.io/schedule/pkg/service/schedule"
+	"kubesphere.io/schedule/pkg/utils/jsonpath"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sync"
 )
 
-// AnalysisReconciler reconciles a Analysis object
-type AnalysisReconciler struct {
+// AnalysisTaskReconciler reconciles a Analysis object
+type AnalysisTaskReconciler struct {
 	sync.Mutex
 	client.Client
 	Scheme *runtime.Scheme
 
+	SchedulerConfig model.SchedulerConfig
+
 	K8SClient          k8s.Client
-	ScheduleClient     schedule.Interface
+	ScheduleClient     schedule.Operator
 	DeploymentInformer v1.DeploymentInformer
+	DynamicInformer    dynamicinformer.DynamicSharedInformerFactory
 	NamespaceInformer  corev1informer.NamespaceInformer
-	NameSpaceCache     map[string]*v1alpha1.Analysis
+	NameSpaceCache     map[string]*v1alpha1.AnalysisTask
 }
 
-//+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analyses,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analyses/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analyses/finalizers,verbs=update
+//+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analysistask,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analysistask/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analysistask/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -63,12 +70,12 @@ type AnalysisReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
-func (r *AnalysisReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *AnalysisTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
 	klog.Infof("[+]---4---")
 
-	analysis := &v1alpha1.Analysis{}
+	analysis := &v1alpha1.AnalysisTask{}
 	err := r.Client.Get(ctx, req.NamespacedName, analysis)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -77,7 +84,7 @@ func (r *AnalysisReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	switch analysis.Spec.Type {
 	case v1alpha1.ResourceTypeDeployment:
 		r.ReconcileDeploymentAnalysis(ctx, analysis)
-		//r.ScheduleClient.CreateAnalysis(analysis.Namespace, analysis.Spec.Target, analysis.Spec.CompletionStrategy)
+		//r.ScheduleClient.CreateCraneAnalysis(analysis.Namespace, analysis.Spec.Target, analysis.Spec.CompletionStrategy)
 	case v1alpha1.ResourceTypeNamespace:
 		r.ReconcileNamespaceAnalysis(ctx, analysis)
 	default:
@@ -87,18 +94,18 @@ func (r *AnalysisReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, nil
 }
 
-func (r *AnalysisReconciler) ReconcileDeploymentAnalysis(ctx context.Context, analysis *schedulev1alpha1.Analysis) {
+func (r *AnalysisTaskReconciler) ReconcileDeploymentAnalysis(ctx context.Context, analysis *schedulev1alpha1.AnalysisTask) {
 	_ = log.FromContext(ctx)
 	for _, resource := range analysis.Spec.ResourceSelectors {
 		if resource.Kind != schedulev1alpha1.ResourceTypeDeployment {
 			klog.Errorf("unknown kind", resource)
 			continue
 		}
-		r.ScheduleClient.CreateAnalysis(analysis.Namespace, resource, analysis.Spec.CompletionStrategy)
+		r.ScheduleClient.CreateCraneAnalysis(ctx, analysis.Namespace, resource, analysis.Spec.CompletionStrategy)
 	}
 }
 
-func (r *AnalysisReconciler) ReconcileNamespaceAnalysis(ctx context.Context, analysis *schedulev1alpha1.Analysis) (ctrl.Result, error) {
+func (r *AnalysisTaskReconciler) ReconcileNamespaceAnalysis(ctx context.Context, analysis *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 	for _, resource := range analysis.Spec.ResourceSelectors {
 		if resource.Kind != schedulev1alpha1.ResourceTypeNamespace {
@@ -119,14 +126,14 @@ func (r *AnalysisReconciler) ReconcileNamespaceAnalysis(ctx context.Context, ana
 		}
 		for _, deployment := range deployments.Items {
 			resource := convertResource(&deployment)
-			r.ScheduleClient.CreateAnalysis(namespace, resource, analysis.Spec.CompletionStrategy)
+			r.ScheduleClient.CreateCraneAnalysis(ctx, namespace, resource, analysis.Spec.CompletionStrategy)
 		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *AnalysisReconciler) DeploymentEventHandler() cache.ResourceEventHandler {
+func (r *AnalysisTaskReconciler) DeploymentEventHandler() cache.ResourceEventHandler {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			klog.Infof("reciver deployment add event", obj.(*appsv1.Deployment).Name)
@@ -134,7 +141,7 @@ func (r *AnalysisReconciler) DeploymentEventHandler() cache.ResourceEventHandler
 			namespace := deployment.Namespace
 			if analysis, ok := r.NameSpaceCache[namespace]; ok {
 				klog.Infof("create deployment analysis", obj.(*appsv1.Deployment).Name)
-				r.ScheduleClient.CreateAnalysis(
+				r.ScheduleClient.CreateCraneAnalysis(context.Background(),
 					deployment.Namespace,
 					convertResource(deployment),
 					analysis.Spec.CompletionStrategy)
@@ -151,7 +158,7 @@ func (r *AnalysisReconciler) DeploymentEventHandler() cache.ResourceEventHandler
 	}
 }
 
-func (r *AnalysisReconciler) NamespaceEventHandler() cache.ResourceEventHandler {
+func (r *AnalysisTaskReconciler) NamespaceEventHandler() cache.ResourceEventHandler {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			klog.Infof("reciver namespace add event", obj.(*corev1.Namespace).Name)
@@ -165,20 +172,53 @@ func (r *AnalysisReconciler) NamespaceEventHandler() cache.ResourceEventHandler 
 	}
 }
 
+func (r *AnalysisTaskReconciler) InstallerEventHandler() cache.ResourceEventHandler {
+	return cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			r.UpdateScheduleConfig(obj)
+			klog.Infof("reciver Installer add event", r.SchedulerConfig)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			r.UpdateScheduleConfig(newObj)
+			klog.Infof("reciver Installer update event", r.SchedulerConfig)
+		},
+		DeleteFunc: func(obj interface{}) {
+			klog.Infof("delete Installer delete event", obj)
+		},
+	}
+}
+
+func (r *AnalysisTaskReconciler) UpdateScheduleConfig(newObj interface{}) {
+	object := jsonpath.New(newObj)
+	cpu, err := object.GetInt64("spec.schedule.analysis.notifyThreshold.cpu")
+	if err == nil {
+		r.SchedulerConfig.CPUNotifyPresent = &cpu
+	}
+	mem, err := object.GetInt64("spec.schedule.analysis.notifyThreshold.mem")
+	if err == nil {
+		r.SchedulerConfig.MemNotifyPresent = &mem
+	}
+}
+
 // SetupWithManager sets up the controller with the Manager.
-func (r *AnalysisReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *AnalysisTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	urlruntime.Must(NotNil(r.K8SClient))
 	urlruntime.Must(NotNil(r.ScheduleClient))
 	urlruntime.Must(NotNil(r.DeploymentInformer))
 	urlruntime.Must(NotNil(r.NamespaceInformer))
+	urlruntime.Must(NotNil(r.DynamicInformer))
 	urlruntime.Must(NotNil(r.NameSpaceCache))
+	urlruntime.Must(NotNil(r.SchedulerConfig))
 
 	klog.Infof("start eatch deployment event")
 	r.DeploymentInformer.Informer().AddEventHandler(r.DeploymentEventHandler())
 	klog.Infof("start eatch namespace event")
 	r.NamespaceInformer.Informer().AddEventHandler(r.NamespaceEventHandler())
+	klog.Infof("start eatch ks-install event")
+	gvr := schema.GroupVersionResource{Group: "installer.kubesphere.io", Version: "v1alpha1", Resource: "clusterconfigurations"}
+	r.DynamicInformer.ForResource(gvr).Informer().AddEventHandler(r.InstallerEventHandler())
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&schedulev1alpha1.Analysis{}).
+		For(&schedulev1alpha1.AnalysisTask{}).
 		Complete(r)
 }

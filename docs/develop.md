@@ -312,6 +312,7 @@ func init() {
 }
 ```
 
+
 ### 生成的 CR 缺少字段
 
 缺少 `DeepCopyInto`
@@ -339,5 +340,44 @@ type Analysis struct {
 }
 ```
 
+### 通过 Object 获取 BVK
+
+// GVKForObject finds the GroupVersionKind associated with the given object, if there is only a single such GVK.
+func GVKForObject(obj runtime.Object, scheme *runtime.Scheme) (schema.GroupVersionKind, error) {
+// TODO(directxman12): do we want to generalize this to arbitrary container types?
+// I think we'd need a generalized form of scheme or something.  It's a
+// shame there's not a reliable "GetGVK" interface that works by default
+// for unpopulated static types and populated "dynamic" types
+// (unstructured, partial, etc)
 
 
+### IDEA Http
+
+```
+> {%
+client.get("
+// client.global.set("auth_token", response.body.result.token);
+%}
+
+
+Authorization: Bearer {{auth_token}}
+```
+
+
+### Config
+
+clusterconfigurations/ks-installer
+```yaml
+
+	scheduler:
+		enable: false
+		defaultScheduler: crane-scheduler
+		schedulers:
+		- kube-scheduler
+		- crane-scheduler
+		analysis:
+		    notifyThreshold:
+		        cpu: 20
+		        mem: 20
+
+```

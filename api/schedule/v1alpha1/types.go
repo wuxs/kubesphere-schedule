@@ -47,7 +47,7 @@ type ResourceSelector struct {
 }
 
 // AnalysisSpec defines the desired state of Analysis
-type AnalysisSpec struct {
+type AnalysisTaskSpec struct {
 	// Kind of the resource, e.g. Deployment
 	Type string `json:"type,omitempty"`
 
@@ -61,7 +61,7 @@ type AnalysisSpec struct {
 }
 
 // AnalysisStatus defines the observed state of Analysis
-type AnalysisStatus struct {
+type AnalysisTaskStatus struct {
 	// LastUpdateTime is the last time the status updated.
 	// +optional
 	LastUpdateTime *metav1.Time `json:"lastUpdateTime,omitempty"`
@@ -72,30 +72,30 @@ type AnalysisStatus struct {
 }
 
 // +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Result
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:shortName=analysis
 // +kubebuilder:subresource:status
 
-// Analysis is the Schema for the analyses API
-type Analysis struct {
+// AnalysisTask is the Schema for the schedule API
+type AnalysisTask struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   AnalysisSpec   `json:"spec,omitempty"`
-	Status AnalysisStatus `json:"status,omitempty"`
+	Spec   AnalysisTaskSpec   `json:"spec,omitempty"`
+	Status AnalysisTaskStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Result
 
 // AnalysisList contains a list of Analysis
-type AnalysisList struct {
+type AnalysisTaskList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Analysis `json:"items"`
+	Items           []AnalysisTask `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Analysis{}, &AnalysisList{})
+	SchemeBuilder.Register(&AnalysisTask{}, &AnalysisTaskList{})
 }

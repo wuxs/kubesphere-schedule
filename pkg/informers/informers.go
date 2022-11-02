@@ -19,6 +19,8 @@ package informers
 import (
 	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
 	extinformers "github.com/gocrane/api/pkg/generated/informers/externalversions"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"reflect"
 	"time"
 
@@ -38,9 +40,10 @@ const defaultResync = 600 * time.Second
 // callers should check if the return value is nil
 type InformerFactory interface {
 	KubernetesSharedInformerFactory() k8sinformers.SharedInformerFactory
-	KubeSphereSharedInformerFactory() ksinformers.SharedInformerFactory
+	ScheduleSharedInformerFactory() ksinformers.SharedInformerFactory
 	ExtensionSharedInformerFactory() extinformers.SharedInformerFactory
 	ApiExtensionSharedInformerFactory() apiextensionsinformers.SharedInformerFactory
+	DynamicSharedInformerFactory() dynamicinformer.DynamicSharedInformerFactory
 	// Start shared informer factory one by one if they are not nil
 	Start(stopCh <-chan struct{})
 }
@@ -52,25 +55,30 @@ type GenericInformerFactory interface {
 
 type informerFactories struct {
 	informerFactory              k8sinformers.SharedInformerFactory
-	ksInformerFactory            ksinformers.SharedInformerFactory
+	scheduleInformerFactory      ksinformers.SharedInformerFactory
 	apiextensionsInformerFactory apiextensionsinformers.SharedInformerFactory
 	extensionsInformerFactory    extinformers.SharedInformerFactory
+	dynamicInformerFactory       dynamicinformer.DynamicSharedInformerFactory
 }
 
-func NewInformerFactories(client kubernetes.Interface, ksClient versioned.Interface, extClient ext.Interface,
-	apiextensionsClient apiextensionsclient.Interface) InformerFactory {
+func NewInformerFactories(client kubernetes.Interface, scheduleClient versioned.Interface, extClient ext.Interface,
+	apiextensionsClient apiextensionsclient.Interface, dynamicClient dynamic.Interface) InformerFactory {
 	factory := &informerFactories{}
 
 	if client != nil {
 		factory.informerFactory = k8sinformers.NewSharedInformerFactory(client, defaultResync)
 	}
 
-	if ksClient != nil {
-		factory.ksInformerFactory = ksinformers.NewSharedInformerFactory(ksClient, defaultResync)
+	if scheduleClient != nil {
+		factory.scheduleInformerFactory = ksinformers.NewSharedInformerFactory(scheduleClient, defaultResync)
 	}
 
 	if apiextensionsClient != nil {
 		factory.apiextensionsInformerFactory = apiextensionsinformers.NewSharedInformerFactory(apiextensionsClient, defaultResync)
+	}
+
+	if dynamicClient != nil {
+		factory.dynamicInformerFactory = dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, defaultResync)
 	}
 
 	if client != nil {
@@ -80,12 +88,16 @@ func NewInformerFactories(client kubernetes.Interface, ksClient versioned.Interf
 	return factory
 }
 
+func (f *informerFactories) DynamicSharedInformerFactory() dynamicinformer.DynamicSharedInformerFactory {
+	return f.dynamicInformerFactory
+}
+
 func (f *informerFactories) KubernetesSharedInformerFactory() k8sinformers.SharedInformerFactory {
 	return f.informerFactory
 }
 
-func (f *informerFactories) KubeSphereSharedInformerFactory() ksinformers.SharedInformerFactory {
-	return f.ksInformerFactory
+func (f *informerFactories) ScheduleSharedInformerFactory() ksinformers.SharedInformerFactory {
+	return f.scheduleInformerFactory
 }
 
 func (f *informerFactories) ApiExtensionSharedInformerFactory() apiextensionsinformers.SharedInformerFactory {
@@ -101,8 +113,8 @@ func (f *informerFactories) Start(stopCh <-chan struct{}) {
 		f.informerFactory.Start(stopCh)
 	}
 
-	if f.ksInformerFactory != nil {
-		f.ksInformerFactory.Start(stopCh)
+	if f.scheduleInformerFactory != nil {
+		f.scheduleInformerFactory.Start(stopCh)
 	}
 
 	if f.apiextensionsInformerFactory != nil {
@@ -111,6 +123,10 @@ func (f *informerFactories) Start(stopCh <-chan struct{}) {
 
 	if f.extensionsInformerFactory != nil {
 		f.extensionsInformerFactory.Start(stopCh)
+	}
+
+	if f.dynamicInformerFactory != nil {
+		f.dynamicInformerFactory.Start(stopCh)
 	}
 
 }

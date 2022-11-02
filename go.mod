@@ -29,7 +29,10 @@ require (
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
+	github.com/emicklei/go-restful-openapi v1.4.1
+	github.com/go-openapi/spec v0.19.5
 	github.com/google/gops v0.3.25
+	github.com/mdaverde/jsonpath v0.2.1
 	github.com/sony/sonyflake v1.1.0
 	github.com/speps/go-hashids/v2 v2.0.1
 	github.com/spf13/cobra v1.1.1
@@ -61,7 +64,6 @@ require (
 	github.com/go-errors/errors v1.0.1 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
-	github.com/go-openapi/spec v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect

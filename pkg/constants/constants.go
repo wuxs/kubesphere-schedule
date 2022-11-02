@@ -50,6 +50,9 @@ const (
 	DevOpsProjectLabelKey             = "kubesphere.io/devopsproject"
 	KubefedManagedLabel               = "kubefed.io/managed"
 
+	KsClusterConfigurationCRDName       = "clusterconfigurations.installer.kubesphere.io"
+	KsClusterConfigurationInstallerName = "ks-installer"
+
 	UserNameHeader = "X-Token-Username"
 
 	AuthenticationTag = "Authentication"
@@ -148,3 +151,9 @@ const (
 var (
 	SystemNamespaces = []string{KubeSphereNamespace, KubeSphereLoggingNamespace, KubeSphereMonitoringNamespace, ScheduleNamespace, KubeSystemNamespace, IstioNamespace, KubesphereDevOpsNamespace, PorterNamespace}
 )
+
+// K8SToken is the context key of k8s token
+var K8SToken = ContextKeyK8SToken("k8s.token")
+
+// ContextKeyK8SToken represents a type alias for the context key
+type ContextKeyK8SToken string

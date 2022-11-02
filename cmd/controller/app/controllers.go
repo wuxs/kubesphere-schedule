@@ -20,7 +20,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	"kubesphere.io/schedule/api/schedule/v1alpha1"
-	"kubesphere.io/schedule/pkg/models/schedule"
+	"kubesphere.io/schedule/pkg/service/model"
+	"kubesphere.io/schedule/pkg/service/schedule"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -56,14 +57,16 @@ func addAllControllers(mgr manager.Manager, client k8s.Client, informerFactory i
 	// "analysis" controller
 	// if cmOptions.IsControllerEnabled("analysis") && !cmOptions.GatewayOptions.IsEmpty(){
 
-	scheduleClient := schedule.NewScheduleOperator(informerFactory, client.KubeSphere(), client.ExtResources(), stopCh)
-	analysisReconciler := &analysis.AnalysisReconciler{
+	scheduleClient := schedule.NewScheduleOperator(informerFactory, client.Kubernetes(), client.Schedule(), client.ExtResources(), client.Dynamic(), stopCh)
+	analysisReconciler := &analysis.AnalysisTaskReconciler{
 		Client:             mgr.GetClient(),
 		K8SClient:          client,
 		ScheduleClient:     scheduleClient,
 		DeploymentInformer: informerFactory.KubernetesSharedInformerFactory().Apps().V1().Deployments(),
 		NamespaceInformer:  informerFactory.KubernetesSharedInformerFactory().Core().V1().Namespaces(),
-		NameSpaceCache:     make(map[string]*v1alpha1.Analysis),
+		DynamicInformer:    informerFactory.DynamicSharedInformerFactory(),
+		NameSpaceCache:     make(map[string]*v1alpha1.AnalysisTask),
+		SchedulerConfig:    model.SchedulerConfig{},
 	}
 	addControllerWithSetup(mgr, "analysis", analysisReconciler)
 

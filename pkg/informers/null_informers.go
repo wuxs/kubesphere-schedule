@@ -18,6 +18,7 @@ package informers
 
 import (
 	extinformers "github.com/gocrane/api/pkg/generated/informers/externalversions"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"time"
 
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
@@ -25,12 +26,12 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	ksfake "kubesphere.io/schedule/pkg/client/clientset/versioned/fake"
-	ksinformers "kubesphere.io/schedule/pkg/client/informers/externalversions"
+	scheduleinformers "kubesphere.io/schedule/pkg/client/informers/externalversions"
 )
 
 type nullInformerFactory struct {
 	fakeK8sInformerFactory informers.SharedInformerFactory
-	fakeKsInformerFactory  ksinformers.SharedInformerFactory
+	fakeKsInformerFactory  scheduleinformers.SharedInformerFactory
 }
 
 func NewNullInformerFactory() InformerFactory {
@@ -38,7 +39,7 @@ func NewNullInformerFactory() InformerFactory {
 	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, time.Minute*10)
 
 	fakeKsClient := ksfake.NewSimpleClientset()
-	fakeKsInformerFactory := ksinformers.NewSharedInformerFactory(fakeKsClient, time.Minute*10)
+	fakeKsInformerFactory := scheduleinformers.NewSharedInformerFactory(fakeKsClient, time.Minute*10)
 
 	return &nullInformerFactory{
 		fakeK8sInformerFactory: fakeInformerFactory,
@@ -50,7 +51,7 @@ func (n nullInformerFactory) KubernetesSharedInformerFactory() informers.SharedI
 	return n.fakeK8sInformerFactory
 }
 
-func (n nullInformerFactory) KubeSphereSharedInformerFactory() ksinformers.SharedInformerFactory {
+func (n nullInformerFactory) ScheduleSharedInformerFactory() scheduleinformers.SharedInformerFactory {
 	return n.fakeKsInformerFactory
 }
 
@@ -59,6 +60,10 @@ func (n nullInformerFactory) ApiExtensionSharedInformerFactory() apiextensionsin
 }
 
 func (n nullInformerFactory) ExtensionSharedInformerFactory() extinformers.SharedInformerFactory {
+	return nil
+}
+
+func (n nullInformerFactory) DynamicSharedInformerFactory() dynamicinformer.DynamicSharedInformerFactory {
 	return nil
 }
 

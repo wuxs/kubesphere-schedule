@@ -20,6 +20,7 @@ import (
 	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"kubesphere.io/schedule/pkg/client/clientset/versioned"
@@ -37,23 +38,29 @@ type FakeClient struct {
 	KubeConfig         *rest.Config
 	ExtResourceClient  ext.Interface
 
-	ksClient versioned.Interface
+	dynamic  dynamic.Interface
+	schedule versioned.Interface
 }
 
-func (n *FakeClient) KubeSphere() versioned.Interface {
-	return n.ksClient
+func (n *FakeClient) Dynamic() dynamic.Interface {
+	return n.dynamic
+}
+
+func (n *FakeClient) Schedule() versioned.Interface {
+	return n.schedule
 }
 
 func NewFakeClientSets(k8sClient kubernetes.Interface, discoveryClient *discovery.DiscoveryClient,
 	apiextensionsclient apiextensionsclient.Interface,
-	masterURL string, kubeConfig *rest.Config, ksClient versioned.Interface) Client {
+	masterURL string, kubeConfig *rest.Config, schedule versioned.Interface, dynamic dynamic.Interface) Client {
 	return &FakeClient{
 		K8sClient:          k8sClient,
 		DiscoveryClient:    discoveryClient,
 		ApiExtensionClient: apiextensionsclient,
 		MasterURL:          masterURL,
 		KubeConfig:         kubeConfig,
-		ksClient:           ksClient,
+		schedule:           schedule,
+		dynamic:            dynamic,
 	}
 }
 

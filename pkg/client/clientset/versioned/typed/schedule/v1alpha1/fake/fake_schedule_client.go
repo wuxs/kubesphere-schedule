@@ -28,8 +28,8 @@ type FakeScheduleV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeScheduleV1alpha1) Analysises(namespace string) v1alpha1.AnalysisInterface {
-	return &FakeAnalysises{c, namespace}
+func (c *FakeScheduleV1alpha1) AnalysisTasks(namespace string) v1alpha1.AnalysisTaskInterface {
+	return &FakeAnalysisTasks{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

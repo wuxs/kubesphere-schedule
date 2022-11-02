@@ -20,8 +20,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	restfulspec "github.com/emicklei/go-restful-openapi"
 	schedulev1alpha1 "kubesphere.io/schedule/pkg/kapis/schedule/v1alpha1"
-	"kubesphere.io/schedule/pkg/models/schedule"
+	"kubesphere.io/schedule/pkg/service/schedule"
 	"net/http"
 	rt "runtime"
 	"time"
@@ -83,7 +84,7 @@ type APIServer struct {
 
 	Client client.Client
 
-	ScheduleClient schedule.Interface
+	ScheduleClient schedule.Operator
 }
 
 func (s *APIServer) PrepareRun(stopCh <-chan struct{}) error {
@@ -97,6 +98,14 @@ func (s *APIServer) PrepareRun(stopCh <-chan struct{}) error {
 	})
 
 	s.installKubeSphereAPIs()
+
+	//add openapi
+	config := restfulspec.Config{
+		WebServices:                   s.container.RegisteredWebServices(), // you control what services are visible
+		APIPath:                       "/apidocs.json",
+		PostBuildSwaggerObjectHandler: schedulev1alpha1.SwaggerObject}
+	s.container.Add(restfulspec.NewOpenAPIService(config))
+	//OpenAPI
 
 	for _, ws := range s.container.RegisteredWebServices() {
 		klog.V(2).Infof("%s", ws.RootPath())
@@ -114,7 +123,8 @@ func (s *APIServer) PrepareRun(stopCh <-chan struct{}) error {
 //
 //	any attempt to list objects using listers will get empty results.
 func (s *APIServer) installKubeSphereAPIs() {
-	urlruntime.Must(schedulev1alpha1.AddToContainer(s.container, s.InformerFactory, s.KubernetesClient.KubeSphere(), s.Config.ScheduleOptions, s.ScheduleClient))
+	urlruntime.Must(schedulev1alpha1.AddToContainer(s.container, s.InformerFactory,
+		s.KubernetesClient.Schedule(), s.Config.ScheduleOptions, s.ScheduleClient))
 }
 
 func (s *APIServer) Run(ctx context.Context) (err error) {
@@ -203,22 +213,27 @@ func (s *APIServer) waitForResourceSync(ctx context.Context) error {
 	stopCh := ctx.Done()
 
 	ScheduleGVRs := map[schema.GroupVersion][]string{
-		{Group: "cluster.kubesphere.io", Version: "v1alpha1"}: {
-			"clusters",
-		},
-		{Group: "application.kubesphere.io", Version: "v1alpha1"}: {
-			"helmapplicationversions",
-			"helmapplications",
-			"helmcategories",
-			"helmrepos",
-			"helmreleases",
+		//{Group:
+		//{Group: "analysis.crane.io", Version: "v1alpha1"}: {
+		//	"analytics",
+		//	"recommendations",
+		//},
+		//{Group: "application.kubesphere.io", Version: "v1alpha1"}: {
+		//	"helmapplicationversions",
+		//	"helmapplications",
+		//	"helmcategories",
+		//	"helmrepos",
+		//	"helmreleases",
+		//},
+		{Group: "schedule.kubesphere.io", Version: "v1alpha1"}: {
+			"analysistasks",
 		},
 	}
 
 	if err := WaitForCacheSync(s.KubernetesClient.Kubernetes().Discovery(),
-		s.InformerFactory.KubeSphereSharedInformerFactory(),
+		s.InformerFactory.ScheduleSharedInformerFactory(),
 		func(resource schema.GroupVersionResource) (interface{}, error) {
-			return s.InformerFactory.KubeSphereSharedInformerFactory().ForResource(resource)
+			return s.InformerFactory.ScheduleSharedInformerFactory().ForResource(resource)
 		},
 		ScheduleGVRs, stopCh); err != nil {
 		return err

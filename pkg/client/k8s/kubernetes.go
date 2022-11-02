@@ -21,15 +21,17 @@ import (
 	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	kubesphere "kubesphere.io/schedule/pkg/client/clientset/versioned"
+	schedule "kubesphere.io/schedule/pkg/client/clientset/versioned"
 )
 
 type Client interface {
 	Kubernetes() kubernetes.Interface
-	KubeSphere() kubesphere.Interface
+	Dynamic() dynamic.Interface
+	Schedule() schedule.Interface
 	ApiExtensions() apiextensionsclient.Interface
 	ExtResources() ext.Interface
 	Discovery() discovery.DiscoveryInterface
@@ -44,11 +46,20 @@ type kubernetesClient struct {
 	discoveryClient *discovery.DiscoveryClient
 
 	// generated clientset
-	ks            kubesphere.Interface
+	schedule      schedule.Interface
 	apiextensions apiextensionsclient.Interface
 	ext           ext.Interface
 	master        string
 	config        *rest.Config
+	dynamic       dynamic.Interface
+}
+
+func (k *kubernetesClient) Dynamic() dynamic.Interface {
+	return k.dynamic
+}
+
+func (k *kubernetesClient) Schedule() schedule.Interface {
+	return k.schedule
 }
 
 // NewKubernetesClientWithConfig creates a k8s client with the rest config
@@ -62,11 +73,30 @@ func NewKubernetesClientWithConfig(config *rest.Config) (client Client, err erro
 		return
 	}
 
-	if k.discoveryClient, err = discovery.NewDiscoveryClientForConfig(config); err != nil {
+	if k.dynamic, err = dynamic.NewForConfig(config); err != nil {
 		return
 	}
 
-	if k.ks, err = kubesphere.NewForConfig(config); err != nil {
+	//gvr := schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}
+	//_, err = vClusterDynamicCli.Resource(gvr).Get(ctx, ksClusterConfigurationCRDName, metav1.GetOptions{})
+	//if err != nil {
+	//	if !apierrors.IsNotFound(err) {
+	//		logger.Error(err, "Failed to get customresourcedefinitions crd in dolphincluster")
+	//		return err
+	//	}
+	//	customresourcedefinitionCRD := r.clusterconfigurationCRDForKs(dolphinCluster)
+	//	_, err = vClusterDynamicCli.Resource(gvr).Create(ctx, customresourcedefinitionCRD, metav1.CreateOptions{})
+	//	if err != nil {
+	//		logger.Error(err, "Failed to create customresourcedefinitions crd in dolphincluster")
+	//		return err
+	//	}
+	//}
+
+	if k.schedule, err = schedule.NewForConfig(config); err != nil {
+		return
+	}
+
+	if k.discoveryClient, err = discovery.NewDiscoveryClientForConfig(config); err != nil {
 		return
 	}
 
@@ -144,8 +174,4 @@ func (k *kubernetesClient) Master() string {
 
 func (k *kubernetesClient) Config() *rest.Config {
 	return k.config
-}
-
-func (k *kubernetesClient) KubeSphere() kubesphere.Interface {
-	return k.ks
 }

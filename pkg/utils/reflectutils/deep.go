@@ -183,7 +183,7 @@ func (c *cmp) equals(a, b reflect.Value, level int) {
 		// Types with an Equal() method, like time.Time, only if struct field
 		// is exported (CanInterface)
 		if eqFunc := a.MethodByName("Equal"); eqFunc.IsValid() && eqFunc.CanInterface() {
-			// Handle https://github.com/go-test/deep/issues/15:
+			// Output https://github.com/go-test/deep/issues/15:
 			// Don't call T.Equal if the method is from an embedded struct, like:
 			//   type Foo struct { time.Time }
 			// First, we'll encounter Equal(Ttime, time.Time) but if we pass b

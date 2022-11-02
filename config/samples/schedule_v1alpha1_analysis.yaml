@@ -1,5 +1,5 @@
 apiVersion: schedule.kubesphere.io/v1alpha1
-kind: Analysis
+kind: AnalysisTask
 metadata:
   labels:
     app.kubernetes.io/name: analysis

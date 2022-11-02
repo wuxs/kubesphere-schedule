@@ -9,7 +9,7 @@ rules:
 - apiGroups:
   - schedule.kubesphere.io
   resources:
-  - analyses
+  - analysistask
   verbs:
   - create
   - delete
@@ -21,13 +21,13 @@ rules:
 - apiGroups:
   - schedule.kubesphere.io
   resources:
-  - analyses/finalizers
+  - analysistask/finalizers
   verbs:
   - update
 - apiGroups:
   - schedule.kubesphere.io
   resources:
-  - analyses/status
+  - analysistask/status
   verbs:
   - get
   - patch
