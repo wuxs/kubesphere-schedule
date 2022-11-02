@@ -18,6 +18,8 @@ package analysis
 
 import (
 	"context"
+	cranev1 "github.com/gocrane/api/analysis/v1alpha1"
+	cranev1informer "github.com/gocrane/api/pkg/generated/informers/externalversions/analysis/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,12 +51,14 @@ type AnalysisTaskReconciler struct {
 
 	SchedulerConfig model.SchedulerConfig
 
-	K8SClient          k8s.Client
-	ScheduleClient     schedule.Operator
-	DeploymentInformer v1.DeploymentInformer
-	DynamicInformer    dynamicinformer.DynamicSharedInformerFactory
-	NamespaceInformer  corev1informer.NamespaceInformer
-	NameSpaceCache     map[string]*v1alpha1.AnalysisTask
+	K8SClient              k8s.Client
+	ScheduleClient         schedule.Operator
+	DeploymentInformer     v1.DeploymentInformer
+	AnalyticsInformer      cranev1informer.AnalyticsInformer
+	RecommendationInformer cranev1informer.RecommendationInformer
+	DynamicInformer        dynamicinformer.DynamicSharedInformerFactory
+	NamespaceInformer      corev1informer.NamespaceInformer
+	NameSpaceCache         map[string]*v1alpha1.AnalysisTask
 }
 
 //+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analysistask,verbs=get;list;watch;create;update;patch;delete
@@ -188,6 +192,39 @@ func (r *AnalysisTaskReconciler) InstallerEventHandler() cache.ResourceEventHand
 	}
 }
 
+func (r *AnalysisTaskReconciler) AnalyticsEventHandler() cache.ResourceEventHandler {
+	return cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			o := obj.(*cranev1.Analytics)
+			klog.Infof("reciver Installer add event", o)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			o := newObj.(*cranev1.Analytics)
+			klog.Infof("reciver Installer update event", o)
+		},
+		DeleteFunc: func(obj interface{}) {
+			o := obj.(*cranev1.Analytics)
+			klog.Infof("reciver Installer delete event", o)
+		},
+	}
+}
+func (r *AnalysisTaskReconciler) RecommendationsEventHandler() cache.ResourceEventHandler {
+	return cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			o := obj.(*cranev1.Recommendation)
+			klog.Infof("reciver Installer add event", o)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			o := newObj.(*cranev1.Recommendation)
+			klog.Infof("reciver Installer update event", o)
+		},
+		DeleteFunc: func(obj interface{}) {
+			o := obj.(*cranev1.Recommendation)
+			klog.Infof("reciver Installer delete event", o)
+		},
+	}
+}
+
 func (r *AnalysisTaskReconciler) UpdateScheduleConfig(newObj interface{}) {
 	object := jsonpath.New(newObj)
 	cpu, err := object.GetInt64("spec.schedule.analysis.notifyThreshold.cpu")
@@ -209,14 +246,19 @@ func (r *AnalysisTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	urlruntime.Must(NotNil(r.DynamicInformer))
 	urlruntime.Must(NotNil(r.NameSpaceCache))
 	urlruntime.Must(NotNil(r.SchedulerConfig))
+	urlruntime.Must(NotNil(r.AnalyticsInformer))
+	urlruntime.Must(NotNil(r.RecommendationInformer))
 
-	klog.Infof("start eatch deployment event")
+	klog.Infof("start weatch deployment event")
 	r.DeploymentInformer.Informer().AddEventHandler(r.DeploymentEventHandler())
-	klog.Infof("start eatch namespace event")
+	klog.Infof("start weatch namespace event")
 	r.NamespaceInformer.Informer().AddEventHandler(r.NamespaceEventHandler())
-	klog.Infof("start eatch ks-install event")
+	klog.Infof("start weatch ks-install event")
 	gvr := schema.GroupVersionResource{Group: "installer.kubesphere.io", Version: "v1alpha1", Resource: "clusterconfigurations"}
 	r.DynamicInformer.ForResource(gvr).Informer().AddEventHandler(r.InstallerEventHandler())
+	klog.Infof("start weatch crane event")
+	r.AnalyticsInformer.Informer().AddEventHandler(r.AnalyticsEventHandler())
+	r.RecommendationInformer.Informer().AddEventHandler(r.RecommendationsEventHandler())
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&schedulev1alpha1.AnalysisTask{}).

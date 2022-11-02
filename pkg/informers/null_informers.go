@@ -46,7 +46,6 @@ func NewNullInformerFactory() InformerFactory {
 		fakeKsInformerFactory:  fakeKsInformerFactory,
 	}
 }
-
 func (n nullInformerFactory) KubernetesSharedInformerFactory() informers.SharedInformerFactory {
 	return n.fakeK8sInformerFactory
 }
@@ -64,6 +63,10 @@ func (n nullInformerFactory) ExtensionSharedInformerFactory() extinformers.Share
 }
 
 func (n nullInformerFactory) DynamicSharedInformerFactory() dynamicinformer.DynamicSharedInformerFactory {
+	return nil
+}
+
+func (n nullInformerFactory) CraneInformer() extinformers.SharedInformerFactory {
 	return nil
 }
 

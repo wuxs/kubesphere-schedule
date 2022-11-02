@@ -18,6 +18,7 @@ package k8s
 
 import (
 	"errors"
+	cranev1 "github.com/gocrane/api/pkg/generated/clientset/versioned"
 	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/discovery"
@@ -33,6 +34,7 @@ type Client interface {
 	Dynamic() dynamic.Interface
 	Schedule() schedule.Interface
 	ApiExtensions() apiextensionsclient.Interface
+	CraneResources() cranev1.Interface
 	ExtResources() ext.Interface
 	Discovery() discovery.DiscoveryInterface
 	Master() string
@@ -47,11 +49,16 @@ type kubernetesClient struct {
 
 	// generated clientset
 	schedule      schedule.Interface
+	crane         cranev1.Interface
 	apiextensions apiextensionsclient.Interface
 	ext           ext.Interface
 	master        string
 	config        *rest.Config
 	dynamic       dynamic.Interface
+}
+
+func (k *kubernetesClient) CraneResources() cranev1.Interface {
+	return k.crane
 }
 
 func (k *kubernetesClient) Dynamic() dynamic.Interface {
@@ -93,6 +100,10 @@ func NewKubernetesClientWithConfig(config *rest.Config) (client Client, err erro
 	//}
 
 	if k.schedule, err = schedule.NewForConfig(config); err != nil {
+		return
+	}
+
+	if k.crane, err = cranev1.NewForConfig(config); err != nil {
 		return
 	}
 

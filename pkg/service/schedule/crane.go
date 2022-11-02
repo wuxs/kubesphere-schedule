@@ -25,12 +25,10 @@ import (
 	"k8s.io/klog"
 	"kubesphere.io/schedule/api/schedule/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 func (s *scheduleOperator) CreateCraneAnalysis(ctx context.Context, namespace string, target v1alpha1.ResourceSelector, strategy cranealpha1.CompletionStrategy) error {
-	analytics := convertAnalytics(target, strategy)
-	name := strings.ToLower(fmt.Sprintf("kubesphere-%s-%s", target.Kind, target.Name))
+	name, analytics := convertAnalytics(target, strategy)
 	analytics, err := s.resClient.AnalysisV1alpha1().Analytics(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) { //creat
 		ret, err := s.resClient.AnalysisV1alpha1().Analytics(namespace).Create(context.Background(), analytics, metav1.CreateOptions{})

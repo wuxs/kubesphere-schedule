@@ -59,14 +59,16 @@ func addAllControllers(mgr manager.Manager, client k8s.Client, informerFactory i
 
 	scheduleClient := schedule.NewScheduleOperator(informerFactory, client.Kubernetes(), client.Schedule(), client.ExtResources(), client.Dynamic(), stopCh)
 	analysisReconciler := &analysis.AnalysisTaskReconciler{
-		Client:             mgr.GetClient(),
-		K8SClient:          client,
-		ScheduleClient:     scheduleClient,
-		DeploymentInformer: informerFactory.KubernetesSharedInformerFactory().Apps().V1().Deployments(),
-		NamespaceInformer:  informerFactory.KubernetesSharedInformerFactory().Core().V1().Namespaces(),
-		DynamicInformer:    informerFactory.DynamicSharedInformerFactory(),
-		NameSpaceCache:     make(map[string]*v1alpha1.AnalysisTask),
-		SchedulerConfig:    model.SchedulerConfig{},
+		Client:                 mgr.GetClient(),
+		K8SClient:              client,
+		ScheduleClient:         scheduleClient,
+		DeploymentInformer:     informerFactory.KubernetesSharedInformerFactory().Apps().V1().Deployments(),
+		NamespaceInformer:      informerFactory.KubernetesSharedInformerFactory().Core().V1().Namespaces(),
+		AnalyticsInformer:      informerFactory.CraneInformer().Analysis().V1alpha1().Analytics(),
+		RecommendationInformer: informerFactory.CraneInformer().Analysis().V1alpha1().Recommendations(),
+		DynamicInformer:        informerFactory.DynamicSharedInformerFactory(),
+		NameSpaceCache:         make(map[string]*v1alpha1.AnalysisTask),
+		SchedulerConfig:        model.SchedulerConfig{},
 	}
 	addControllerWithSetup(mgr, "analysis", analysisReconciler)
 

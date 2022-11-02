@@ -40,19 +40,13 @@ type FakeClient struct {
 
 	dynamic  dynamic.Interface
 	schedule versioned.Interface
-}
-
-func (n *FakeClient) Dynamic() dynamic.Interface {
-	return n.dynamic
-}
-
-func (n *FakeClient) Schedule() versioned.Interface {
-	return n.schedule
+	crane    ext.Interface
 }
 
 func NewFakeClientSets(k8sClient kubernetes.Interface, discoveryClient *discovery.DiscoveryClient,
 	apiextensionsclient apiextensionsclient.Interface,
-	masterURL string, kubeConfig *rest.Config, schedule versioned.Interface, dynamic dynamic.Interface) Client {
+	masterURL string, kubeConfig *rest.Config, schedule versioned.Interface,
+	dynamic dynamic.Interface, crane ext.Interface) Client {
 	return &FakeClient{
 		K8sClient:          k8sClient,
 		DiscoveryClient:    discoveryClient,
@@ -61,6 +55,7 @@ func NewFakeClientSets(k8sClient kubernetes.Interface, discoveryClient *discover
 		KubeConfig:         kubeConfig,
 		schedule:           schedule,
 		dynamic:            dynamic,
+		crane:              crane,
 	}
 }
 
@@ -86,4 +81,16 @@ func (n *FakeClient) Master() string {
 
 func (n *FakeClient) Config() *rest.Config {
 	return n.KubeConfig
+}
+
+func (n *FakeClient) CraneResources() ext.Interface {
+	return n.crane
+}
+
+func (n *FakeClient) Dynamic() dynamic.Interface {
+	return n.dynamic
+}
+
+func (n *FakeClient) Schedule() versioned.Interface {
+	return n.schedule
 }

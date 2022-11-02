@@ -17,9 +17,11 @@ limitations under the License.
 package schedule
 
 import (
+	"fmt"
 	cranealpha1 "github.com/gocrane/api/analysis/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"kubesphere.io/schedule/api/schedule/v1alpha1"
+	"strings"
 )
 
 //
@@ -849,9 +851,12 @@ import (
 //	return
 //}
 
-func convertAnalytics(target v1alpha1.ResourceSelector, strategy cranealpha1.CompletionStrategy) *cranealpha1.Analytics {
-	analytics := cranealpha1.Analytics{
-		ObjectMeta: metav1.ObjectMeta{},
+func convertAnalytics(target v1alpha1.ResourceSelector, strategy cranealpha1.CompletionStrategy) (name string, analytics *cranealpha1.Analytics) {
+	name = strings.ToLower(fmt.Sprintf("kubesphere-%s-%s", target.Kind, target.Name))
+	analytics = &cranealpha1.Analytics{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
 		Spec: cranealpha1.AnalyticsSpec{
 			Type: cranealpha1.AnalysisTypeResource,
 			ResourceSelectors: []cranealpha1.ResourceSelector{cranealpha1.ResourceSelector{
@@ -860,5 +865,5 @@ func convertAnalytics(target v1alpha1.ResourceSelector, strategy cranealpha1.Com
 			CompletionStrategy: strategy,
 		},
 	}
-	return &analytics
+	return analytics.Name, analytics
 }

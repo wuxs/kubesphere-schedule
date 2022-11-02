@@ -18,6 +18,7 @@ package informers
 
 import (
 	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
+	cranev1informer "github.com/gocrane/api/pkg/generated/informers/externalversions"
 	extinformers "github.com/gocrane/api/pkg/generated/informers/externalversions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -29,6 +30,7 @@ import (
 	k8sinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 
+	cranev1 "github.com/gocrane/api/pkg/generated/clientset/versioned"
 	"kubesphere.io/schedule/pkg/client/clientset/versioned"
 	ksinformers "kubesphere.io/schedule/pkg/client/informers/externalversions"
 )
@@ -44,6 +46,7 @@ type InformerFactory interface {
 	ExtensionSharedInformerFactory() extinformers.SharedInformerFactory
 	ApiExtensionSharedInformerFactory() apiextensionsinformers.SharedInformerFactory
 	DynamicSharedInformerFactory() dynamicinformer.DynamicSharedInformerFactory
+	CraneInformer() cranev1informer.SharedInformerFactory
 	// Start shared informer factory one by one if they are not nil
 	Start(stopCh <-chan struct{})
 }
@@ -59,9 +62,11 @@ type informerFactories struct {
 	apiextensionsInformerFactory apiextensionsinformers.SharedInformerFactory
 	extensionsInformerFactory    extinformers.SharedInformerFactory
 	dynamicInformerFactory       dynamicinformer.DynamicSharedInformerFactory
+	craneInformer                cranev1informer.SharedInformerFactory
 }
 
-func NewInformerFactories(client kubernetes.Interface, scheduleClient versioned.Interface, extClient ext.Interface,
+func NewInformerFactories(client kubernetes.Interface, scheduleClient versioned.Interface,
+	extClient ext.Interface, craneClient cranev1.Interface,
 	apiextensionsClient apiextensionsclient.Interface, dynamicClient dynamic.Interface) InformerFactory {
 	factory := &informerFactories{}
 
@@ -79,6 +84,10 @@ func NewInformerFactories(client kubernetes.Interface, scheduleClient versioned.
 
 	if dynamicClient != nil {
 		factory.dynamicInformerFactory = dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, defaultResync)
+	}
+
+	if craneClient != nil {
+		factory.craneInformer = cranev1informer.NewSharedInformerFactory(craneClient, defaultResync)
 	}
 
 	if client != nil {
@@ -108,6 +117,10 @@ func (f *informerFactories) ExtensionSharedInformerFactory() extinformers.Shared
 	return f.extensionsInformerFactory
 }
 
+func (f *informerFactories) CraneInformer() extinformers.SharedInformerFactory {
+	return f.craneInformer
+}
+
 func (f *informerFactories) Start(stopCh <-chan struct{}) {
 	if f.informerFactory != nil {
 		f.informerFactory.Start(stopCh)
@@ -127,6 +140,10 @@ func (f *informerFactories) Start(stopCh <-chan struct{}) {
 
 	if f.dynamicInformerFactory != nil {
 		f.dynamicInformerFactory.Start(stopCh)
+	}
+
+	if f.craneInformer != nil {
+		f.craneInformer.Start(stopCh)
 	}
 
 }

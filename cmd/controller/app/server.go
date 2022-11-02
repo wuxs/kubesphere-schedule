@@ -145,6 +145,7 @@ func run(s *options.KubeSphereControllerManagerOptions, ctx context.Context) err
 		kubernetesClient.Kubernetes(),
 		kubernetesClient.Schedule(),
 		kubernetesClient.ExtResources(),
+		kubernetesClient.ExtResources(),
 		kubernetesClient.ApiExtensions(),
 		kubernetesClient.Dynamic())
 
