@@ -42,6 +42,9 @@ func Result(args ...interface{}) *object {
 		return &object{Type: 1, Err: e1}
 	default:
 		if len(args) >= 2 {
+			if args[1] == nil {
+				return &object{Type: 2, Object: e1, Err: nil}
+			}
 			if e2, ok := args[1].(error); ok {
 				return &object{Type: 2, Object: e1, Err: e2}
 			}
