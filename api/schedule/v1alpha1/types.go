@@ -49,7 +49,8 @@ type ResourceSelector struct {
 
 // AnalysisSpec defines the desired state of Analysis
 type AnalysisTaskSpec struct {
-	// Kind of the resource, e.g. Deployment\Namespace
+	// Type of the resource,
+	// Type is one of: "Deployment", "Namespace"
 	Type string `json:"type,omitempty"`
 
 	// Target what the analysis is for.

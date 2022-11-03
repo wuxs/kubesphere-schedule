@@ -22,6 +22,7 @@ import (
 	cranev1informer "github.com/gocrane/api/pkg/generated/informers/externalversions/analysis/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -84,6 +85,9 @@ func (r *AnalysisTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	instance := &v1alpha1.AnalysisTask{}
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
+	if apierrors.IsNotFound(err) {
+		return ctrl.Result{}, nil
+	}
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -168,6 +172,10 @@ func (r *AnalysisTaskReconciler) doReconcileDeploymentAnalysis(ctx context.Conte
 		// add deployment index
 		key := deploymentIndexKey(instance.Namespace, resource.Name)
 		r.UpdateDeploymentIndexCache(key, instance)
+		if deployment, err := r.K8SClient.Kubernetes().AppsV1().Deployments(instance.Namespace).Get(ctx, resource.Name, metav1.GetOptions{}); err == nil {
+			r.UpdateDeploymentStatus(key, deployment)
+		}
+
 	}
 	return ctrl.Result{}, nil
 }
@@ -179,6 +187,7 @@ func (r *AnalysisTaskReconciler) undoReconcileDeploymentAnalysis(ctx context.Con
 			klog.Errorf("unknown kind %s", resource.Name)
 			continue
 		}
+
 		name, analytics := convertAnalytics("deployment", resource, instance.Spec.CompletionStrategy)
 		analytics = labelAnalyticsWithAnalysisName(analytics, instance)
 		if err := r.ScheduleClient.DeleteCraneAnalysis(ctx, instance.Namespace, name, analytics); err != nil {
@@ -222,6 +231,7 @@ func (r *AnalysisTaskReconciler) doReconcileNamespaceAnalysis(ctx context.Contex
 			// add deployment index
 			key := deploymentIndexKey(instance.Namespace, resource.Name)
 			r.UpdateDeploymentIndexCache(key, instance)
+			r.UpdateDeploymentStatus(key, &deployment)
 		}
 	}
 	return ctrl.Result{}, nil
@@ -297,7 +307,20 @@ func (r *AnalysisTaskReconciler) UpdateDeploymentIndexCache(key string, instance
 
 func (r *AnalysisTaskReconciler) UpdateDeploymentStatus(key string, deployment *appsv1.Deployment) {
 	if instance, ok := r.DeploymentIndexCache[key]; ok {
+		instance, err := r.K8SClient.Schedule().ScheduleV1alpha1().AnalysisTasks(instance.Namespace).Get(context.Background(), instance.Name, metav1.GetOptions{})
+		if err != nil {
+			klog.Errorf("get analysis task error: %s", err.Error())
+			return
+		}
+		if instance.Status.TargetDeployments == nil {
+			instance.Status.TargetDeployments = make(map[string]*appsv1.Deployment)
+		}
 		instance.Status.TargetDeployments[deployment.Name] = deployment
+		instance, err = r.K8SClient.Schedule().ScheduleV1alpha1().AnalysisTasks(instance.Namespace).UpdateStatus(context.Background(), instance, metav1.UpdateOptions{})
+		if err != nil {
+			klog.Errorf("update deployment status error: %s", err.Error())
+		}
+		r.DeploymentIndexCache[key] = instance
 	}
 }
 

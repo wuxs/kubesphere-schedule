@@ -92,8 +92,7 @@ type scheduleOperator struct {
 }
 
 func (s *scheduleOperator) DescribeAnalysisTask(ctx context.Context, namespace, id string) (*v1alpha1.AnalysisTask, error) {
-	//TODO implement me
-	panic("implement me")
+	return s.scheduleClient.ScheduleV1alpha1().AnalysisTasks(namespace).Get(ctx, id, metav1.GetOptions{})
 }
 
 func (s *scheduleOperator) DeleteAnalysisTask(ctx context.Context, namespace, id string) error {
