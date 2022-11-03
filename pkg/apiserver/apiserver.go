@@ -22,7 +22,7 @@ import (
 	"fmt"
 	restfulspec "github.com/emicklei/go-restful-openapi"
 	schedulev1alpha1 "kubesphere.io/schedule/pkg/kapis/schedule/v1alpha1"
-	"kubesphere.io/schedule/pkg/service/schedule"
+	"kubesphere.io/schedule/pkg/models/schedule"
 	"net/http"
 	rt "runtime"
 	"time"

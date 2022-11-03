@@ -18,7 +18,7 @@ package analysis
 
 import (
 	"context"
-	cranev1 "github.com/gocrane/api/analysis/v1alpha1"
+	cranev1alpha1 "github.com/gocrane/api/analysis/v1alpha1"
 	cranev1informer "github.com/gocrane/api/pkg/generated/informers/externalversions/analysis/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,12 +34,14 @@ import (
 	"kubesphere.io/schedule/api/schedule/v1alpha1"
 	schedulev1alpha1 "kubesphere.io/schedule/api/schedule/v1alpha1"
 	"kubesphere.io/schedule/pkg/client/k8s"
-	"kubesphere.io/schedule/pkg/service/model"
-	"kubesphere.io/schedule/pkg/service/schedule"
+	"kubesphere.io/schedule/pkg/constants"
+	"kubesphere.io/schedule/pkg/models/schedule"
 	"kubesphere.io/schedule/pkg/utils/jsonpath"
+	"kubesphere.io/schedule/pkg/utils/sliceutil"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sync"
 )
 
@@ -49,7 +51,7 @@ type AnalysisTaskReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	SchedulerConfig model.SchedulerConfig
+	SchedulerConfig schedule.SchedulerConfig
 
 	K8SClient              k8s.Client
 	ScheduleClient         schedule.Operator
@@ -79,39 +81,107 @@ func (r *AnalysisTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	klog.Infof("[+]---4---")
 
-	analysis := &v1alpha1.AnalysisTask{}
-	err := r.Client.Get(ctx, req.NamespacedName, analysis)
+	instance := &v1alpha1.AnalysisTask{}
+	err := r.Client.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	switch analysis.Spec.Type {
-	case v1alpha1.ResourceTypeDeployment:
-		r.ReconcileDeploymentAnalysis(ctx, analysis)
-		//r.ScheduleClient.CreateCraneAnalysis(analysis.Namespace, analysis.Spec.Target, analysis.Spec.CompletionStrategy)
-	case v1alpha1.ResourceTypeNamespace:
-		r.ReconcileNamespaceAnalysis(ctx, analysis)
-	default:
-		klog.Infof("not support resource type", analysis.Spec.Type)
+	isDeletion := !instance.ObjectMeta.DeletionTimestamp.IsZero()
+	isConstructed := sliceutil.HasString(instance.ObjectMeta.Finalizers, constants.AnalysisTaskFinalizer)
+
+	if isDeletion {
+		if isConstructed {
+			if _, err := r.undoReconcile(ctx, instance); err != nil {
+				return reconcile.Result{}, err
+			}
+
+			instance.ObjectMeta.Finalizers = sliceutil.RemoveString(instance.ObjectMeta.Finalizers, func(item string) bool {
+				if item == constants.AnalysisTaskFinalizer {
+					return true
+				}
+				return false
+			})
+			if err := r.Update(context.Background(), instance); err != nil {
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, nil
+		}
+	} else {
+		if !isConstructed {
+			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, constants.AnalysisTaskFinalizer)
+			if err := r.Update(context.Background(), instance); err != nil {
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, nil
+		} else {
+			if _, err := r.doReconcile(ctx, instance); err != nil {
+				return reconcile.Result{}, err
+			}
+		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *AnalysisTaskReconciler) ReconcileDeploymentAnalysis(ctx context.Context, analysis *schedulev1alpha1.AnalysisTask) {
+func (r *AnalysisTaskReconciler) doReconcile(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
+	switch instance.Spec.Type {
+	case v1alpha1.ResourceTypeDeployment:
+		r.doReconcileDeploymentAnalysis(ctx, instance)
+		//r.ScheduleClient.CreateCraneAnalysis(analysis.Namespace, analysis.Spec.Target, analysis.Spec.CompletionStrategy)
+	case v1alpha1.ResourceTypeNamespace:
+		r.doReconcileNamespaceAnalysis(ctx, instance)
+	default:
+		klog.Infof("not support resource type", instance.Spec.Type)
+	}
+}
+
+func (r *AnalysisTaskReconciler) undoReconcile(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
+	switch instance.Spec.Type {
+	case v1alpha1.ResourceTypeDeployment:
+		return r.undoReconcileDeploymentAnalysis(ctx, instance)
+		//r.ScheduleClient.CreateCraneAnalysis(analysis.Namespace, analysis.Spec.Target, analysis.Spec.CompletionStrategy)
+	case v1alpha1.ResourceTypeNamespace:
+		return r.undoReconcileNamespaceAnalysis(ctx, instance)
+	default:
+		klog.Infof("not support resource type", instance.Spec.Type)
+		return ctrl.Result{}, nil
+	}
+}
+
+func (r *AnalysisTaskReconciler) doReconcileDeploymentAnalysis(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) {
 	_ = log.FromContext(ctx)
-	for _, resource := range analysis.Spec.ResourceSelectors {
+	for _, resource := range instance.Spec.ResourceSelectors {
 		if resource.Kind != schedulev1alpha1.ResourceTypeDeployment {
 			klog.Errorf("unknown kind", resource)
 			continue
 		}
-		r.ScheduleClient.CreateCraneAnalysis(ctx, analysis.Namespace, resource, analysis.Spec.CompletionStrategy)
+		name, analytics := convertAnalytics(resource, instance.Spec.CompletionStrategy)
+		analytics = labelAnalyticsWithAnalysisName(analytics, instance)
+		r.ScheduleClient.CreateCraneAnalysis(ctx, instance.Namespace, name, analytics)
 	}
 }
+func (r *AnalysisTaskReconciler) undoReconcileDeploymentAnalysis(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
+	//删除 Analysis
+	for _, resource := range instance.Spec.ResourceSelectors {
+		if resource.Kind != schedulev1alpha1.ResourceTypeDeployment {
+			klog.Errorf("unknown kind", resource)
+			continue
+		}
+		name, analytics := convertAnalytics(resource, instance.Spec.CompletionStrategy)
+		analytics = labelAnalyticsWithAnalysisName(analytics, instance)
+		if err := r.ScheduleClient.DeleteCraneAnalysis(ctx, instance.Namespace, name, analytics); err != nil {
+			klog.Errorf("delete analysis error", err)
+			return ctrl.Result{}, err
+		}
+	}
+	return ctrl.Result{}, nil
+}
 
-func (r *AnalysisTaskReconciler) ReconcileNamespaceAnalysis(ctx context.Context, analysis *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
+func (r *AnalysisTaskReconciler) doReconcileNamespaceAnalysis(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-	for _, resource := range analysis.Spec.ResourceSelectors {
+
+	for _, resource := range instance.Spec.ResourceSelectors {
 		if resource.Kind != schedulev1alpha1.ResourceTypeNamespace {
 			klog.Errorf("unknown kind", resource)
 			continue
@@ -121,7 +191,7 @@ func (r *AnalysisTaskReconciler) ReconcileNamespaceAnalysis(ctx context.Context,
 		if namespace == "" {
 			return ctrl.Result{}, nil
 		}
-		r.NameSpaceCache[namespace] = analysis
+		r.NameSpaceCache[namespace] = instance
 
 		deployments, err := r.K8SClient.Kubernetes().AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -130,10 +200,47 @@ func (r *AnalysisTaskReconciler) ReconcileNamespaceAnalysis(ctx context.Context,
 		}
 		for _, deployment := range deployments.Items {
 			resource := convertResource(&deployment)
-			r.ScheduleClient.CreateCraneAnalysis(ctx, namespace, resource, analysis.Spec.CompletionStrategy)
+			name, analytics := convertAnalytics(resource, instance.Spec.CompletionStrategy)
+			analytics = labelAnalyticsWithAnalysisName(analytics, instance)
+			err = r.ScheduleClient.CreateCraneAnalysis(ctx, namespace, name, analytics)
+			if err != nil {
+				klog.Errorf("creat analysis error", err)
+				return ctrl.Result{}, err
+			}
 		}
 	}
+	return ctrl.Result{}, nil
+}
 
+func (r *AnalysisTaskReconciler) undoReconcileNamespaceAnalysis(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
+	//删除 Analysis
+
+	for _, resource := range instance.Spec.ResourceSelectors {
+		if resource.Kind != schedulev1alpha1.ResourceTypeNamespace ||
+			resource.Name == "" {
+			klog.Errorf("unknown kind", resource)
+			continue
+		}
+		namespace := resource.Name
+		r.NameSpaceCache[namespace] = instance
+
+		deployments, err := r.K8SClient.Kubernetes().AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+		//@TODO namespace 已删除？如何处理
+		if err != nil {
+			klog.Errorf("get deployment error", err)
+			return ctrl.Result{}, err
+		}
+		for _, deployment := range deployments.Items {
+			resource := convertResource(&deployment)
+			name, analytics := convertAnalytics(resource, instance.Spec.CompletionStrategy)
+			analytics = labelAnalyticsWithAnalysisName(analytics, instance)
+			err = r.ScheduleClient.DeleteCraneAnalysis(ctx, namespace, name, analytics)
+			if err != nil {
+				klog.Errorf("creat analysis error", err)
+				return ctrl.Result{}, err
+			}
+		}
+	}
 	return ctrl.Result{}, nil
 }
 
@@ -145,10 +252,11 @@ func (r *AnalysisTaskReconciler) DeploymentEventHandler() cache.ResourceEventHan
 			namespace := deployment.Namespace
 			if analysis, ok := r.NameSpaceCache[namespace]; ok {
 				klog.Infof("create deployment analysis", obj.(*appsv1.Deployment).Name)
+				name, analytics := convertAnalytics(convertResource(deployment), analysis.Spec.CompletionStrategy)
 				r.ScheduleClient.CreateCraneAnalysis(context.Background(),
 					deployment.Namespace,
-					convertResource(deployment),
-					analysis.Spec.CompletionStrategy)
+					name,
+					analytics)
 			} else {
 				klog.Infof("skip create deployment analysis", obj.(*appsv1.Deployment).Name)
 			}
@@ -176,7 +284,7 @@ func (r *AnalysisTaskReconciler) NamespaceEventHandler() cache.ResourceEventHand
 	}
 }
 
-func (r *AnalysisTaskReconciler) InstallerEventHandler() cache.ResourceEventHandler {
+func (r *AnalysisTaskReconciler) ConfigEventHandler() cache.ResourceEventHandler {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			r.UpdateScheduleConfig(obj)
@@ -195,31 +303,34 @@ func (r *AnalysisTaskReconciler) InstallerEventHandler() cache.ResourceEventHand
 func (r *AnalysisTaskReconciler) AnalyticsEventHandler() cache.ResourceEventHandler {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			o := obj.(*cranev1.Analytics)
-			klog.Infof("reciver Installer add event", o)
+			o := obj.(*cranev1alpha1.Analytics)
+			klog.Infof("reciver Analytics add event", o)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			o := newObj.(*cranev1.Analytics)
-			klog.Infof("reciver Installer update event", o)
+			o := newObj.(*cranev1alpha1.Analytics)
+			klog.Infof("reciver Analytics update event", o.Status.LastUpdateTime)
+			for _, comm := range o.Status.Recommendations {
+				klog.Infof("reciver Analytics update event", comm.Name, comm.Message)
+			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			o := obj.(*cranev1.Analytics)
-			klog.Infof("reciver Installer delete event", o)
+			o := obj.(*cranev1alpha1.Analytics)
+			klog.Infof("reciver Analytics delete event", o)
 		},
 	}
 }
 func (r *AnalysisTaskReconciler) RecommendationsEventHandler() cache.ResourceEventHandler {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			o := obj.(*cranev1.Recommendation)
+			o := obj.(*cranev1alpha1.Recommendation)
 			klog.Infof("reciver Installer add event", o)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			o := newObj.(*cranev1.Recommendation)
+			o := newObj.(*cranev1alpha1.Recommendation)
 			klog.Infof("reciver Installer update event", o)
 		},
 		DeleteFunc: func(obj interface{}) {
-			o := obj.(*cranev1.Recommendation)
+			o := obj.(*cranev1alpha1.Recommendation)
 			klog.Infof("reciver Installer delete event", o)
 		},
 	}
@@ -249,16 +360,13 @@ func (r *AnalysisTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	urlruntime.Must(NotNil(r.AnalyticsInformer))
 	urlruntime.Must(NotNil(r.RecommendationInformer))
 
-	klog.Infof("start weatch deployment event")
 	r.DeploymentInformer.Informer().AddEventHandler(r.DeploymentEventHandler())
-	klog.Infof("start weatch namespace event")
 	r.NamespaceInformer.Informer().AddEventHandler(r.NamespaceEventHandler())
-	klog.Infof("start weatch ks-install event")
-	gvr := schema.GroupVersionResource{Group: "installer.kubesphere.io", Version: "v1alpha1", Resource: "clusterconfigurations"}
-	r.DynamicInformer.ForResource(gvr).Informer().AddEventHandler(r.InstallerEventHandler())
-	klog.Infof("start weatch crane event")
 	r.AnalyticsInformer.Informer().AddEventHandler(r.AnalyticsEventHandler())
 	r.RecommendationInformer.Informer().AddEventHandler(r.RecommendationsEventHandler())
+	r.DynamicInformer.ForResource(schema.GroupVersionResource{
+		Group: "installer.kubesphere.io", Version: "v1alpha1", Resource: "clusterconfigurations",
+	}).Informer().AddEventHandler(r.ConfigEventHandler())
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&schedulev1alpha1.AnalysisTask{}).

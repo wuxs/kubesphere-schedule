@@ -21,10 +21,9 @@ import (
 	"kubesphere.io/schedule/api"
 	"kubesphere.io/schedule/api/schedule/v1alpha1"
 	"kubesphere.io/schedule/pkg/constants"
+	"kubesphere.io/schedule/pkg/models"
+	"kubesphere.io/schedule/pkg/models/schedule"
 	"kubesphere.io/schedule/pkg/server/params"
-	"kubesphere.io/schedule/pkg/service"
-	"kubesphere.io/schedule/pkg/service/model"
-	"kubesphere.io/schedule/pkg/service/schedule"
 	"net/http"
 
 	"kubesphere.io/schedule/pkg/apiserver/runtime"
@@ -73,7 +72,7 @@ func AddToContainer(c *restful.Container, ksInfomrers informers.InformerFactory,
 	//获取调度器列表 GET /scheduler @TODO
 	webservice.Route(webservice.GET("/scheduler").
 		To(handler.ListScheduler).
-		Returns(http.StatusOK, api.StatusOK, model.SchedulerConfig{}).
+		Returns(http.StatusOK, api.StatusOK, schedule.SchedulerConfig{}).
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.ScheduleTag}).
 		Doc("List all applications within the specified cluster"))
 
@@ -83,8 +82,8 @@ func AddToContainer(c *restful.Container, ksInfomrers informers.InformerFactory,
 		To(handler.ModifyScheduler).
 		Doc("Modify default scheduler").
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.ScheduleTag}).
-		Reads(model.SchedulerConfig{}).
-		Returns(http.StatusOK, api.StatusOK, model.SchedulerConfig{}))
+		Reads(schedule.SchedulerConfig{}).
+		Returns(http.StatusOK, api.StatusOK, schedule.SchedulerConfig{}))
 
 	//修改分析任务提醒设置 POST /analysis/notify (通过CM存放) @TODO
 	webservice.Route(webservice.PATCH("/analysis/config").
@@ -92,13 +91,13 @@ func AddToContainer(c *restful.Container, ksInfomrers informers.InformerFactory,
 		To(handler.ModifyAnalysisTaskConfig).
 		Doc("Modify analysis config").
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.ScheduleTag}).
-		Reads(model.SchedulerConfig{}).
-		Returns(http.StatusOK, api.StatusOK, model.SchedulerConfig{}))
+		Reads(schedule.SchedulerConfig{}).
+		Returns(http.StatusOK, api.StatusOK, schedule.SchedulerConfig{}))
 
 	//获取分析任务列表 GET /analysis @TODO
 	webservice.Route(webservice.GET("/analysis").
 		To(handler.ListAnalysisTask).
-		Returns(http.StatusOK, api.StatusOK, service.PageableResponse{}).
+		Returns(http.StatusOK, api.StatusOK, models.PageableResponse{}).
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.ScheduleTag}).
 		Doc("List all applications within the specified cluster").
 		Param(webservice.QueryParameter(params.ConditionsParam, "query conditions, connect multiple conditions with commas, equal symbol for exact query, wave symbol for fuzzy query e.g. name~a").

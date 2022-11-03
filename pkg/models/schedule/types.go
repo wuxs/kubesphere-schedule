@@ -11,11 +11,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package model
+package schedule
 
 type SchedulerConfig struct {
 	// name of the default scheduler
-	scheduler        *string `json:"scheduler,omitempty"`
+	Scheduler        *string `json:"scheduler,omitempty"`
 	MemNotifyPresent *int64  `json:"mem_notify_present,omitempty"`
 	CPUNotifyPresent *int64  `json:"cpu_notify_present,omitempty"`
 }

@@ -35,6 +35,8 @@ const (
 	KubeSphereConfigName          = "kubesphere-config"
 	KubeSphereConfigMapDataKey    = "kubesphere.yaml"
 
+	AnalysisLabel                     = "kubesphere.io/analysis"
+	AnalysisTaskFinalizer             = "analysistaskfinalizer.schedule.kubesphere.io"
 	ClusterNameLabelKey               = "kubesphere.io/cluster"
 	NameLabelKey                      = "kubesphere.io/name"
 	WorkspaceLabelKey                 = "kubesphere.io/workspace"

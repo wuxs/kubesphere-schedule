@@ -23,24 +23,20 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
-	"kubesphere.io/schedule/api/schedule/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (s *scheduleOperator) CreateCraneAnalysis(ctx context.Context, namespace string, target v1alpha1.ResourceSelector, strategy cranealpha1.CompletionStrategy) error {
-	name, analytics := convertAnalytics(target, strategy)
+func (s *scheduleOperator) CreateCraneAnalysis(ctx context.Context, namespace string, name string, new *cranealpha1.Analytics) error {
 	analytics, err := s.resClient.AnalysisV1alpha1().Analytics(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) { //creat
-		ret, err := s.resClient.AnalysisV1alpha1().Analytics(namespace).Create(context.Background(), analytics, metav1.CreateOptions{})
+		_, err := s.resClient.AnalysisV1alpha1().Analytics(namespace).Create(context.Background(), analytics, metav1.CreateOptions{})
 		if err != nil {
-			klog.Errorf("create analytics error: %v", err)
 			return fmt.Errorf("create analytics error: %w", err)
 		}
-		klog.Infof("create analytics ok: %v", ret)
 		return nil
 	} else if err == nil { //update
 		analyticsCopy := analytics.DeepCopy()
-		analyticsCopy.Spec = analyticsCopy.Spec
+		analyticsCopy.Spec = new.Spec
 
 		patch := client.MergeFrom(analytics)
 		data, err := patch.Data(analyticsCopy)
@@ -62,8 +58,15 @@ func (s *scheduleOperator) CreateCraneAnalysis(ctx context.Context, namespace st
 		}
 		return nil
 	} else {
-		klog.Errorf("create analytics error: %v", err)
 		return fmt.Errorf("create analytics error: %w", err)
 	}
 
+}
+
+func (s *scheduleOperator) DeleteCraneAnalysis(ctx context.Context, namespace string, name string, analytics *cranealpha1.Analytics) error {
+	err := s.resClient.AnalysisV1alpha1().Analytics(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }

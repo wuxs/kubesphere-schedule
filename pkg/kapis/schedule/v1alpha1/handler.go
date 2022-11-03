@@ -28,8 +28,7 @@ import (
 	"kubesphere.io/schedule/pkg/constants"
 	"kubesphere.io/schedule/pkg/informers"
 	"kubesphere.io/schedule/pkg/kapis"
-	"kubesphere.io/schedule/pkg/service/model"
-	"kubesphere.io/schedule/pkg/service/schedule"
+	"kubesphere.io/schedule/pkg/models/schedule"
 )
 
 var (
@@ -166,7 +165,7 @@ func (h *scheduleHandler) DeleteAnalysisTask(request *restful.Request, response 
 
 func (h *scheduleHandler) ModifyAnalysisTaskConfig(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
-	var analysisConfig *model.SchedulerConfig
+	var analysisConfig *schedule.SchedulerConfig
 	err := request.ReadEntity(&analysisConfig)
 	if err != nil {
 		klog.V(4).Infoln(err)

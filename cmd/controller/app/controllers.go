@@ -20,8 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	"kubesphere.io/schedule/api/schedule/v1alpha1"
-	"kubesphere.io/schedule/pkg/service/model"
-	"kubesphere.io/schedule/pkg/service/schedule"
+	"kubesphere.io/schedule/pkg/models/schedule"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -68,7 +67,7 @@ func addAllControllers(mgr manager.Manager, client k8s.Client, informerFactory i
 		RecommendationInformer: informerFactory.CraneInformer().Analysis().V1alpha1().Recommendations(),
 		DynamicInformer:        informerFactory.DynamicSharedInformerFactory(),
 		NameSpaceCache:         make(map[string]*v1alpha1.AnalysisTask),
-		SchedulerConfig:        model.SchedulerConfig{},
+		SchedulerConfig:        schedule.SchedulerConfig{},
 	}
 	addControllerWithSetup(mgr, "analysis", analysisReconciler)
 

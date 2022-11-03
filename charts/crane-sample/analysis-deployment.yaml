@@ -7,7 +7,7 @@ spec:
   type: Resource                        # This can only be "Resource" or "Replicas".
   completionStrategy:
     completionStrategyType: Periodical  # This can only be "Once" or "Periodical".
-    periodSeconds: 86400                # analytics selected resources every 1 day
+    periodSeconds: 60                # analytics selected resources every 1 day
   resourceSelectors:                    # defines all the resources to be select with
     - kind: Deployment
       apiVersion: apps/v1

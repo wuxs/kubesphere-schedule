@@ -18,8 +18,11 @@ package analysis
 
 import (
 	"fmt"
+	cranev1alpha1 "github.com/gocrane/api/analysis/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulev1alpha1 "kubesphere.io/schedule/api/schedule/v1alpha1"
+	"kubesphere.io/schedule/pkg/constants"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"strings"
@@ -60,3 +63,32 @@ func convertResource(deployment *appsv1.Deployment) schedulev1alpha1.ResourceSel
 }
 
 var getQKV = apiutil.GVKForObject
+
+func convertAnalytics(target schedulev1alpha1.ResourceSelector, strategy cranev1alpha1.CompletionStrategy) (name string, analytics *cranev1alpha1.Analytics) {
+	name = strings.ToLower(fmt.Sprintf("kubesphere-%s-%s", target.Kind, target.Name))
+	analytics = &cranev1alpha1.Analytics{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: cranev1alpha1.AnalyticsSpec{
+			Type: cranev1alpha1.AnalysisTypeResource,
+			ResourceSelectors: []cranev1alpha1.ResourceSelector{cranev1alpha1.ResourceSelector{
+				Kind: target.Kind, APIVersion: target.APIVersion, Name: target.Name,
+			}},
+			CompletionStrategy: strategy,
+		},
+	}
+	return analytics.Name, analytics
+}
+
+// labelAnalyticsWithAnalysisName adds a kubesphere.io/analysis=[analysisName] label to crane.analysis
+func labelAnalyticsWithAnalysisName(analytics *cranev1alpha1.Analytics, analysisTask *schedulev1alpha1.AnalysisTask) *cranev1alpha1.Analytics {
+	if analytics.Labels == nil {
+		analytics.Labels = make(map[string]string, 0)
+	}
+
+	label := fmt.Sprintf("%s/%s", analysisTask.Spec.Type, analysisTask.Name)
+	analytics.Labels[constants.AnalysisLabel] = label
+
+	return analytics
+}

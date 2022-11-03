@@ -36,8 +36,7 @@ import (
 	"kubesphere.io/schedule/pkg/client/informers/externalversions"
 	"kubesphere.io/schedule/pkg/constants"
 	ks_informers "kubesphere.io/schedule/pkg/informers"
-	"kubesphere.io/schedule/pkg/service/model"
-	resourcesV1alpha3 "kubesphere.io/schedule/pkg/service/resources/v1alpha3"
+	resourcesV1alpha3 "kubesphere.io/schedule/pkg/models/resources/v1alpha3"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
 )
@@ -61,10 +60,11 @@ type Operator interface {
 	ModifyAnalysisTask(ctx context.Context, namespace, id string, task *v1alpha1.AnalysisTask) error
 	DescribeAnalysisTask(ctx context.Context, namespace, id string) (*v1alpha1.AnalysisTask, error)
 	DeleteAnalysisTask(ctx context.Context, namespace, id string) error
-	ModifyAnalysisTaskConfig(ctx context.Context, schedule *model.SchedulerConfig) (*model.SchedulerConfig, error)
+	ModifyAnalysisTaskConfig(ctx context.Context, schedule *SchedulerConfig) (*SchedulerConfig, error)
 
 	//Crane
-	CreateCraneAnalysis(ctx context.Context, namespace string, target v1alpha1.ResourceSelector, strategy cranealpha1.CompletionStrategy) error
+	CreateCraneAnalysis(ctx context.Context, namespace string, name string, analytics *cranealpha1.Analytics) error
+	DeleteCraneAnalysis(ctx context.Context, namespace string, name string, analytics *cranealpha1.Analytics) error
 }
 
 func NewScheduleOperator(ksInformers ks_informers.InformerFactory,
@@ -100,7 +100,7 @@ func (s *scheduleOperator) DeleteAnalysisTask(ctx context.Context, namespace, id
 	return s.scheduleClient.ScheduleV1alpha1().AnalysisTasks(namespace).Delete(ctx, id, metav1.DeleteOptions{})
 }
 
-func (s *scheduleOperator) ModifyAnalysisTaskConfig(ctx context.Context, config *model.SchedulerConfig) (*model.SchedulerConfig, error) {
+func (s *scheduleOperator) ModifyAnalysisTaskConfig(ctx context.Context, config *SchedulerConfig) (*SchedulerConfig, error) {
 
 	gvr := schema.GroupVersionResource{Group: "installer.kubesphere.io", Version: "v1alpha1", Resource: "clusterconfigurations"}
 

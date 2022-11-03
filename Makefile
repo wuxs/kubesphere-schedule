@@ -169,15 +169,15 @@ openapi-gen:
 ifeq (, $(shell which openapi-gen))
 	@{ \
 	set -e ;\
-	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$CONTROLLER_GEN_TMP_DIR ;\
+	OPENAPI_GEN_TMP_DIR=$$(mktemp -d) ;\
+	cd $$OPENAPI_GEN_TMP_DIR ;\
 	go mod init tmp ;\
 	go install k8s.io/kube-openapi/cmd/openapi-gen ;\
-	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
+	rm -rf $$OPENAPI_GEN_TMP_DIR ;\
 	}
-CONTROLLER_GEN=$(GOBIN)/openapi-gen
+OPENAPI_GEN=$(GOBIN)/openapi-gen
 else
-CONTROLLER_GEN=$(shell which openapi-gen)
+OPENAPI_GEN=$(shell which openapi-gen)
 endif
 
 
