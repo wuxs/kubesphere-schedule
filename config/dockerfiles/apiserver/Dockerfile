@@ -7,6 +7,7 @@ WORKDIR /workspace
 COPY go.mod go.sum Makefile ./
 COPY cmd cmd/
 COPY pkg pkg/
+COPY api api/
 
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
