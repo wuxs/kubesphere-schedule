@@ -79,7 +79,7 @@ type AnalysisTaskReconciler struct {
 func (r *AnalysisTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	klog.Infof("[+]---4---")
+	klog.Infof("Reconcile AnalysisTask %s", req.NamespacedName)
 
 	instance := &v1alpha1.AnalysisTask{}
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
@@ -127,13 +127,14 @@ func (r *AnalysisTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *AnalysisTaskReconciler) doReconcile(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
 	switch instance.Spec.Type {
 	case v1alpha1.ResourceTypeDeployment:
-		r.doReconcileDeploymentAnalysis(ctx, instance)
-		//r.ScheduleClient.CreateCraneAnalysis(analysis.Namespace, analysis.Spec.Target, analysis.Spec.CompletionStrategy)
+		return r.doReconcileDeploymentAnalysis(ctx, instance)
 	case v1alpha1.ResourceTypeNamespace:
-		r.doReconcileNamespaceAnalysis(ctx, instance)
+		return r.doReconcileNamespaceAnalysis(ctx, instance)
 	default:
-		klog.Infof("not support resource type", instance.Spec.Type)
+		klog.Infof("not support resource type %s", instance.Spec.Type)
+		return ctrl.Result{}, nil
 	}
+
 }
 
 func (r *AnalysisTaskReconciler) undoReconcile(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
@@ -144,34 +145,38 @@ func (r *AnalysisTaskReconciler) undoReconcile(ctx context.Context, instance *sc
 	case v1alpha1.ResourceTypeNamespace:
 		return r.undoReconcileNamespaceAnalysis(ctx, instance)
 	default:
-		klog.Infof("not support resource type", instance.Spec.Type)
+		klog.Infof("not support resource type %s", instance.Spec.Type)
 		return ctrl.Result{}, nil
 	}
 }
 
-func (r *AnalysisTaskReconciler) doReconcileDeploymentAnalysis(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) {
+func (r *AnalysisTaskReconciler) doReconcileDeploymentAnalysis(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 	for _, resource := range instance.Spec.ResourceSelectors {
 		if resource.Kind != schedulev1alpha1.ResourceTypeDeployment {
-			klog.Errorf("unknown kind", resource)
+			klog.Errorf("unknown kind %s", resource)
 			continue
 		}
 		name, analytics := convertAnalytics(resource, instance.Spec.CompletionStrategy)
 		analytics = labelAnalyticsWithAnalysisName(analytics, instance)
-		r.ScheduleClient.CreateCraneAnalysis(ctx, instance.Namespace, name, analytics)
+		if err := r.ScheduleClient.CreateCraneAnalysis(ctx, instance.Namespace, name, analytics); err != nil {
+			klog.Errorf("creat analysis error %s", err.Error())
+			return ctrl.Result{}, err
+		}
 	}
+	return ctrl.Result{}, nil
 }
 func (r *AnalysisTaskReconciler) undoReconcileDeploymentAnalysis(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
 	//删除 Analysis
 	for _, resource := range instance.Spec.ResourceSelectors {
 		if resource.Kind != schedulev1alpha1.ResourceTypeDeployment {
-			klog.Errorf("unknown kind", resource)
+			klog.Errorf("unknown kind %s", resource.Name)
 			continue
 		}
 		name, analytics := convertAnalytics(resource, instance.Spec.CompletionStrategy)
 		analytics = labelAnalyticsWithAnalysisName(analytics, instance)
 		if err := r.ScheduleClient.DeleteCraneAnalysis(ctx, instance.Namespace, name, analytics); err != nil {
-			klog.Errorf("delete analysis error", err)
+			klog.Errorf("delete analysis error: %s", err.Error())
 			return ctrl.Result{}, err
 		}
 	}
@@ -183,7 +188,7 @@ func (r *AnalysisTaskReconciler) doReconcileNamespaceAnalysis(ctx context.Contex
 
 	for _, resource := range instance.Spec.ResourceSelectors {
 		if resource.Kind != schedulev1alpha1.ResourceTypeNamespace {
-			klog.Errorf("unknown kind", resource)
+			klog.Errorf("unknown kind %v", resource)
 			continue
 		}
 
@@ -195,7 +200,7 @@ func (r *AnalysisTaskReconciler) doReconcileNamespaceAnalysis(ctx context.Contex
 
 		deployments, err := r.K8SClient.Kubernetes().AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
-			klog.Errorf("get deployment error", err)
+			klog.Errorf("get deployment error: %s", err.Error())
 			return ctrl.Result{}, err
 		}
 		for _, deployment := range deployments.Items {
@@ -204,7 +209,7 @@ func (r *AnalysisTaskReconciler) doReconcileNamespaceAnalysis(ctx context.Contex
 			analytics = labelAnalyticsWithAnalysisName(analytics, instance)
 			err = r.ScheduleClient.CreateCraneAnalysis(ctx, namespace, name, analytics)
 			if err != nil {
-				klog.Errorf("creat analysis error", err)
+				klog.Errorf("creat analysis error: %s", err.Error())
 				return ctrl.Result{}, err
 			}
 		}
@@ -218,16 +223,15 @@ func (r *AnalysisTaskReconciler) undoReconcileNamespaceAnalysis(ctx context.Cont
 	for _, resource := range instance.Spec.ResourceSelectors {
 		if resource.Kind != schedulev1alpha1.ResourceTypeNamespace ||
 			resource.Name == "" {
-			klog.Errorf("unknown kind", resource)
+			klog.Errorf("unknown kind %v", resource)
 			continue
 		}
 		namespace := resource.Name
 		r.NameSpaceCache[namespace] = instance
 
 		deployments, err := r.K8SClient.Kubernetes().AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
-		//@TODO namespace 已删除？如何处理
 		if err != nil {
-			klog.Errorf("get deployment error", err)
+			klog.Errorf("get deployment error: %s", err.Error())
 			return ctrl.Result{}, err
 		}
 		for _, deployment := range deployments.Items {
@@ -236,7 +240,7 @@ func (r *AnalysisTaskReconciler) undoReconcileNamespaceAnalysis(ctx context.Cont
 			analytics = labelAnalyticsWithAnalysisName(analytics, instance)
 			err = r.ScheduleClient.DeleteCraneAnalysis(ctx, namespace, name, analytics)
 			if err != nil {
-				klog.Errorf("creat analysis error", err)
+				klog.Errorf("creat analysis error: %s", err.Error())
 				return ctrl.Result{}, err
 			}
 		}
@@ -247,25 +251,25 @@ func (r *AnalysisTaskReconciler) undoReconcileNamespaceAnalysis(ctx context.Cont
 func (r *AnalysisTaskReconciler) DeploymentEventHandler() cache.ResourceEventHandler {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			klog.Infof("reciver deployment add event", obj.(*appsv1.Deployment).Name)
+			klog.V(4).Infof("reciver deployment add event %s", obj.(*appsv1.Deployment).Name)
 			deployment := obj.(*appsv1.Deployment)
 			namespace := deployment.Namespace
 			if analysis, ok := r.NameSpaceCache[namespace]; ok {
-				klog.Infof("create deployment analysis", obj.(*appsv1.Deployment).Name)
+				klog.V(4).Infof("create deployment analysis %s", obj.(*appsv1.Deployment).Name)
 				name, analytics := convertAnalytics(convertResource(deployment), analysis.Spec.CompletionStrategy)
 				r.ScheduleClient.CreateCraneAnalysis(context.Background(),
 					deployment.Namespace,
 					name,
 					analytics)
 			} else {
-				klog.Infof("skip create deployment analysis", obj.(*appsv1.Deployment).Name)
+				klog.V(4).Infof("skip create deployment analysis %s", obj.(*appsv1.Deployment).Name)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			klog.Infof("reciver deployment update event", newObj.(*appsv1.Deployment).Name)
+			klog.V(4).Infof("reciver deployment update event %s", newObj.(*appsv1.Deployment).Name)
 		},
 		DeleteFunc: func(obj interface{}) {
-			klog.Infof("delete deployment delete event", obj.(*appsv1.Deployment).Name)
+			klog.V(4).Infof("delete deployment delete event %s", obj.(*appsv1.Deployment).Name)
 		},
 	}
 }
@@ -273,13 +277,13 @@ func (r *AnalysisTaskReconciler) DeploymentEventHandler() cache.ResourceEventHan
 func (r *AnalysisTaskReconciler) NamespaceEventHandler() cache.ResourceEventHandler {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			klog.Infof("reciver namespace add event", obj.(*corev1.Namespace).Name)
+			klog.V(4).Infof("reciver namespace add event %s", obj.(*corev1.Namespace).Name)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			klog.Infof("reciver namespace update event", newObj.(*corev1.Namespace).Name)
+			klog.V(4).Infof("reciver namespace update event %s", newObj.(*corev1.Namespace).Name)
 		},
 		DeleteFunc: func(obj interface{}) {
-			klog.Infof("delete namespace delete event", obj.(*corev1.Namespace).Name)
+			klog.V(4).Infof("delete namespace delete event %s", obj.(*corev1.Namespace).Name)
 		},
 	}
 }
@@ -288,14 +292,14 @@ func (r *AnalysisTaskReconciler) ConfigEventHandler() cache.ResourceEventHandler
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			r.UpdateScheduleConfig(obj)
-			klog.Infof("reciver Installer add event", r.SchedulerConfig)
+			klog.V(4).Infof("reciver Installer add event %v", r.SchedulerConfig)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			r.UpdateScheduleConfig(newObj)
-			klog.Infof("reciver Installer update event", r.SchedulerConfig)
+			klog.V(4).Infof("reciver Installer update event %v", r.SchedulerConfig)
 		},
 		DeleteFunc: func(obj interface{}) {
-			klog.Infof("delete Installer delete event", obj)
+			klog.V(4).Infof("delete Installer delete event %v", obj)
 		},
 	}
 }
@@ -304,18 +308,18 @@ func (r *AnalysisTaskReconciler) AnalyticsEventHandler() cache.ResourceEventHand
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			o := obj.(*cranev1alpha1.Analytics)
-			klog.Infof("reciver Analytics add event", o)
+			klog.V(4).Infof("reciver Analytics add event %v", o)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			o := newObj.(*cranev1alpha1.Analytics)
-			klog.Infof("reciver Analytics update event", o.Status.LastUpdateTime)
+			klog.Infof("reciver Analytics update event %v", o.Status.LastUpdateTime)
 			for _, comm := range o.Status.Recommendations {
-				klog.Infof("reciver Analytics update event", comm.Name, comm.Message)
+				klog.V(4).Infof("reciver Analytics update event %s: %s", comm.Name, comm.Message)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			o := obj.(*cranev1alpha1.Analytics)
-			klog.Infof("reciver Analytics delete event", o)
+			klog.V(4).Infof("reciver Analytics delete event %v", o)
 		},
 	}
 }
@@ -323,15 +327,15 @@ func (r *AnalysisTaskReconciler) RecommendationsEventHandler() cache.ResourceEve
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			o := obj.(*cranev1alpha1.Recommendation)
-			klog.Infof("reciver Installer add event", o)
+			klog.Infof("reciver Installer add event %v", o)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			o := newObj.(*cranev1alpha1.Recommendation)
-			klog.Infof("reciver Installer update event", o)
+			klog.Infof("reciver Installer update event %v", o)
 		},
 		DeleteFunc: func(obj interface{}) {
 			o := obj.(*cranev1alpha1.Recommendation)
-			klog.Infof("reciver Installer delete event", o)
+			klog.Infof("reciver Installer delete event %v", o)
 		},
 	}
 }
