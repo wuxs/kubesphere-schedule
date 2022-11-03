@@ -1,8 +1,7 @@
-
 apiVersion: analysis.crane.io/v1alpha1
 kind: Analytics
 metadata:
-  name: nginx-resource
+  name: cpu-stress-resource
 spec:
   type: Resource                        # This can only be "Resource" or "Replicas".
   completionStrategy:

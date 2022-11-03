@@ -1,13 +1,14 @@
-apiVersion: analysis.crane.io/v1alpha1
-kind: Analytics
+
+apiVersion: schedule.kubesphere.io/v1alpha1
+kind: AnalysisTask
 metadata:
-  name: nginx-resource
+  name: analysistask-abcd1234
 spec:
   type: Resource                        # This can only be "Resource" or "Replicas".
   completionStrategy:
     completionStrategyType: Periodical  # This can only be "Once" or "Periodical".
-    periodSeconds: 86400                # analytics selected resources every 1 day
+    periodSeconds: 60                # analytics selected resources every 1 day
   resourceSelectors:                    # defines all the resources to be select with
     - kind: Deployment
       apiVersion: apps/v1
-      name: nginx-deployment
+      name: cpu-stress
