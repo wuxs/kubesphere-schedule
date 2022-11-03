@@ -29,7 +29,7 @@ import (
 func (s *scheduleOperator) CreateCraneAnalysis(ctx context.Context, namespace string, name string, new *cranealpha1.Analytics) error {
 	analytics, err := s.resClient.AnalysisV1alpha1().Analytics(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) { //creat
-		_, err := s.resClient.AnalysisV1alpha1().Analytics(namespace).Create(context.Background(), analytics, metav1.CreateOptions{})
+		_, err := s.resClient.AnalysisV1alpha1().Analytics(namespace).Create(context.Background(), new, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("create analytics error: %w", err)
 		}

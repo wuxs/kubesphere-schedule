@@ -61,6 +61,7 @@ type AnalysisTaskReconciler struct {
 	DynamicInformer        dynamicinformer.DynamicSharedInformerFactory
 	NamespaceInformer      corev1informer.NamespaceInformer
 	NameSpaceCache         map[string]*v1alpha1.AnalysisTask
+	DeploymentIndexCache   map[string]*v1alpha1.AnalysisTask
 }
 
 //+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analysistask,verbs=get;list;watch;create;update;patch;delete
@@ -157,15 +158,20 @@ func (r *AnalysisTaskReconciler) doReconcileDeploymentAnalysis(ctx context.Conte
 			klog.Errorf("unknown kind %s", resource)
 			continue
 		}
-		name, analytics := convertAnalytics(resource, instance.Spec.CompletionStrategy)
+		name, analytics := convertAnalytics("deployment", resource, instance.Spec.CompletionStrategy)
 		analytics = labelAnalyticsWithAnalysisName(analytics, instance)
 		if err := r.ScheduleClient.CreateCraneAnalysis(ctx, instance.Namespace, name, analytics); err != nil {
 			klog.Errorf("creat analysis error %s", err.Error())
 			return ctrl.Result{}, err
 		}
+
+		// add deployment index
+		key := deploymentIndexKey(instance.Namespace, resource.Name)
+		r.UpdateDeploymentIndexCache(key, instance)
 	}
 	return ctrl.Result{}, nil
 }
+
 func (r *AnalysisTaskReconciler) undoReconcileDeploymentAnalysis(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
 	//删除 Analysis
 	for _, resource := range instance.Spec.ResourceSelectors {
@@ -173,7 +179,7 @@ func (r *AnalysisTaskReconciler) undoReconcileDeploymentAnalysis(ctx context.Con
 			klog.Errorf("unknown kind %s", resource.Name)
 			continue
 		}
-		name, analytics := convertAnalytics(resource, instance.Spec.CompletionStrategy)
+		name, analytics := convertAnalytics("deployment", resource, instance.Spec.CompletionStrategy)
 		analytics = labelAnalyticsWithAnalysisName(analytics, instance)
 		if err := r.ScheduleClient.DeleteCraneAnalysis(ctx, instance.Namespace, name, analytics); err != nil {
 			klog.Errorf("delete analysis error: %s", err.Error())
@@ -205,13 +211,17 @@ func (r *AnalysisTaskReconciler) doReconcileNamespaceAnalysis(ctx context.Contex
 		}
 		for _, deployment := range deployments.Items {
 			resource := convertResource(&deployment)
-			name, analytics := convertAnalytics(resource, instance.Spec.CompletionStrategy)
+			name, analytics := convertAnalytics("namespace", resource, instance.Spec.CompletionStrategy)
 			analytics = labelAnalyticsWithAnalysisName(analytics, instance)
 			err = r.ScheduleClient.CreateCraneAnalysis(ctx, namespace, name, analytics)
 			if err != nil {
 				klog.Errorf("creat analysis error: %s", err.Error())
 				return ctrl.Result{}, err
 			}
+
+			// add deployment index
+			key := deploymentIndexKey(instance.Namespace, resource.Name)
+			r.UpdateDeploymentIndexCache(key, instance)
 		}
 	}
 	return ctrl.Result{}, nil
@@ -236,7 +246,7 @@ func (r *AnalysisTaskReconciler) undoReconcileNamespaceAnalysis(ctx context.Cont
 		}
 		for _, deployment := range deployments.Items {
 			resource := convertResource(&deployment)
-			name, analytics := convertAnalytics(resource, instance.Spec.CompletionStrategy)
+			name, analytics := convertAnalytics("namespace", resource, instance.Spec.CompletionStrategy)
 			analytics = labelAnalyticsWithAnalysisName(analytics, instance)
 			err = r.ScheduleClient.DeleteCraneAnalysis(ctx, namespace, name, analytics)
 			if err != nil {
@@ -256,7 +266,7 @@ func (r *AnalysisTaskReconciler) DeploymentEventHandler() cache.ResourceEventHan
 			namespace := deployment.Namespace
 			if analysis, ok := r.NameSpaceCache[namespace]; ok {
 				klog.V(4).Infof("create deployment analysis %s", obj.(*appsv1.Deployment).Name)
-				name, analytics := convertAnalytics(convertResource(deployment), analysis.Spec.CompletionStrategy)
+				name, analytics := convertAnalytics("namespace", convertResource(deployment), analysis.Spec.CompletionStrategy)
 				r.ScheduleClient.CreateCraneAnalysis(context.Background(),
 					deployment.Namespace,
 					name,
@@ -264,13 +274,30 @@ func (r *AnalysisTaskReconciler) DeploymentEventHandler() cache.ResourceEventHan
 			} else {
 				klog.V(4).Infof("skip create deployment analysis %s", obj.(*appsv1.Deployment).Name)
 			}
+
+			key := deploymentIndexKey(deployment.Namespace, deployment.Name)
+			r.UpdateDeploymentStatus(key, deployment)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
+			deployment := newObj.(*appsv1.Deployment)
 			klog.V(4).Infof("reciver deployment update event %s", newObj.(*appsv1.Deployment).Name)
+
+			key := deploymentIndexKey(deployment.Namespace, deployment.Name)
+			r.UpdateDeploymentStatus(key, deployment)
 		},
 		DeleteFunc: func(obj interface{}) {
 			klog.V(4).Infof("delete deployment delete event %s", obj.(*appsv1.Deployment).Name)
 		},
+	}
+}
+
+func (r *AnalysisTaskReconciler) UpdateDeploymentIndexCache(key string, instance *schedulev1alpha1.AnalysisTask) {
+	r.DeploymentIndexCache[key] = instance
+}
+
+func (r *AnalysisTaskReconciler) UpdateDeploymentStatus(key string, deployment *appsv1.Deployment) {
+	if instance, ok := r.DeploymentIndexCache[key]; ok {
+		instance.Status.TargetDeployments[deployment.Name] = deployment
 	}
 }
 
@@ -359,10 +386,11 @@ func (r *AnalysisTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	urlruntime.Must(NotNil(r.DeploymentInformer))
 	urlruntime.Must(NotNil(r.NamespaceInformer))
 	urlruntime.Must(NotNil(r.DynamicInformer))
-	urlruntime.Must(NotNil(r.NameSpaceCache))
 	urlruntime.Must(NotNil(r.SchedulerConfig))
 	urlruntime.Must(NotNil(r.AnalyticsInformer))
 	urlruntime.Must(NotNil(r.RecommendationInformer))
+	urlruntime.Must(NotNil(r.NameSpaceCache))
+	urlruntime.Must(NotNil(r.DeploymentIndexCache))
 
 	r.DeploymentInformer.Informer().AddEventHandler(r.DeploymentEventHandler())
 	r.NamespaceInformer.Informer().AddEventHandler(r.NamespaceEventHandler())

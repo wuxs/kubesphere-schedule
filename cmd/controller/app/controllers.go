@@ -66,8 +66,9 @@ func addAllControllers(mgr manager.Manager, client k8s.Client, informerFactory i
 		AnalyticsInformer:      informerFactory.CraneInformer().Analysis().V1alpha1().Analytics(),
 		RecommendationInformer: informerFactory.CraneInformer().Analysis().V1alpha1().Recommendations(),
 		DynamicInformer:        informerFactory.DynamicSharedInformerFactory(),
-		NameSpaceCache:         make(map[string]*v1alpha1.AnalysisTask),
 		SchedulerConfig:        schedule.SchedulerConfig{},
+		NameSpaceCache:         make(map[string]*v1alpha1.AnalysisTask),
+		DeploymentIndexCache:   make(map[string]*v1alpha1.AnalysisTask),
 	}
 	addControllerWithSetup(mgr, "analysis", analysisReconciler)
 

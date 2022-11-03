@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	cranev1 "github.com/gocrane/api/analysis/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -48,7 +49,7 @@ type ResourceSelector struct {
 
 // AnalysisSpec defines the desired state of Analysis
 type AnalysisTaskSpec struct {
-	// Kind of the resource, e.g. Deployment
+	// Kind of the resource, e.g. Deployment\Namespace
 	Type string `json:"type,omitempty"`
 
 	// Target what the analysis is for.
@@ -62,6 +63,11 @@ type AnalysisTaskSpec struct {
 
 // AnalysisStatus defines the observed state of Analysis
 type AnalysisTaskStatus struct {
+	// Status is the status of AnalysisTask.
+	// Status is one of: "Pending", "Running", "Succeeded", "Failed", "Error", "Unknown"
+	// +optional
+	Status string `json:"status,omitempty"`
+
 	// LastUpdateTime is the last time the status updated.
 	// +optional
 	LastUpdateTime *metav1.Time `json:"lastUpdateTime,omitempty"`
@@ -69,6 +75,10 @@ type AnalysisTaskStatus struct {
 	// Conditions is an array of current analytics conditions.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// TargetDeployments is an array of current analytics conditions.
+	// +optional
+	TargetDeployments map[string]*appsv1.Deployment `json:"targetDeployments,omitempty"`
 }
 
 // +genclient

@@ -4,11 +4,11 @@ kind: AnalysisTask
 metadata:
   name: analysistask-abcd1234
 spec:
-  type: Deployment                        # This can only be "Deployment" or "Namespace".
+  type: Namespace                        # This can only be "Deployment" or "Namespace".
   completionStrategy:
     completionStrategyType: Periodical  # This can only be "Once" or "Periodical".
     periodSeconds: 60                # analytics selected resources every 1 day
   resourceSelectors:                    # defines all the resources to be select with
-    - kind: Deployment
+    - kind: Namespace
       apiVersion: apps/v1
-      name: cpu-stress
+      name: default

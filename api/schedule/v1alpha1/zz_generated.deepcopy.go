@@ -22,6 +22,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -120,6 +121,21 @@ func (in *AnalysisTaskStatus) DeepCopyInto(out *AnalysisTaskStatus) {
 		*out = make([]v1.Condition, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.TargetDeployments != nil {
+		in, out := &in.TargetDeployments, &out.TargetDeployments
+		*out = make(map[string]*appsv1.Deployment, len(*in))
+		for key, val := range *in {
+			var outVal *appsv1.Deployment
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = new(appsv1.Deployment)
+				(*in).DeepCopyInto(*out)
+			}
+			(*out)[key] = outVal
 		}
 	}
 }

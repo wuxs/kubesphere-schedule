@@ -5,6 +5,7 @@ ARG GOPROXY
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.sum Makefile ./
+COPY api api/
 COPY cmd cmd/
 COPY pkg pkg/
 

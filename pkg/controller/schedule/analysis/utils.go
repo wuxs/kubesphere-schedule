@@ -62,10 +62,14 @@ func convertResource(deployment *appsv1.Deployment) schedulev1alpha1.ResourceSel
 	}
 }
 
+func deploymentIndexKey(namespace, name string) string {
+	return fmt.Sprintf("%s/deployment/%s", namespace, name)
+}
+
 var getQKV = apiutil.GVKForObject
 
-func convertAnalytics(target schedulev1alpha1.ResourceSelector, strategy cranev1alpha1.CompletionStrategy) (name string, analytics *cranev1alpha1.Analytics) {
-	name = strings.ToLower(fmt.Sprintf("kubesphere-%s-%s", target.Kind, target.Name))
+func convertAnalytics(prefix string, target schedulev1alpha1.ResourceSelector, strategy cranev1alpha1.CompletionStrategy) (name string, analytics *cranev1alpha1.Analytics) {
+	name = strings.ToLower(fmt.Sprintf("kubesphere-%s-%s", prefix, target.Name))
 	analytics = &cranev1alpha1.Analytics{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -87,8 +91,7 @@ func labelAnalyticsWithAnalysisName(analytics *cranev1alpha1.Analytics, analysis
 		analytics.Labels = make(map[string]string, 0)
 	}
 
-	label := fmt.Sprintf("%s/%s", analysisTask.Spec.Type, analysisTask.Name)
-	analytics.Labels[constants.AnalysisLabel] = label
+	analytics.Labels[constants.AnalysisLabel] = analysisTask.Name
 
 	return analytics
 }
