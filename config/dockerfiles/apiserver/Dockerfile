@@ -8,21 +8,24 @@ COPY go.mod go.sum Makefile ./
 COPY api api/
 COPY cmd cmd/
 COPY pkg pkg/
+COPY vendor vendor/
 
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-RUN go mod download && \
-    # Build
-    CGO_ENABLED=0 GO111MODULE=on go build -a -o apiserver cmd/apiserver/apiserver.go && \
-    # download Swagger UI files
-    make swagger-ui
+#RUN go mod download && \
+#    # Build
+#    CGO_ENABLED=0 GO111MODULE=on go build -a -o apiserver cmd/apiserver/apiserver.go && \
+#    # download Swagger UI files
+#    make swagger-ui
+# Build
+RUN CGO_ENABLED=0 GO111MODULE=on GOARCH=amd64 go build -mod=vendor -a -o apiserver cmd/apiserver/apiserver.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/apiserver .
-COPY --from=builder /workspace/bin/swagger-ui/dist bin/swagger-ui/dist
+#COPY --from=builder /workspace/bin/swagger-ui/dist bin/swagger-ui/dist
 USER nonroot:nonroot
 
 ENTRYPOINT ["/apiserver"]
