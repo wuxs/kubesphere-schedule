@@ -176,6 +176,8 @@ func (s *scheduleOperator) ModifyAnalysisTask(ctx context.Context, namespace, id
 	}
 
 	analysisCopy := analysis.DeepCopy()
+	analysisCopy.Annotations = task.Annotations
+	analysisCopy.Labels = task.Labels
 	analysisCopy.Spec = task.Spec
 	analysisCopy.Labels = task.Labels
 
