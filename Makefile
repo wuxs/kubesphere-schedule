@@ -36,27 +36,6 @@ tools-jwt: fmt vet
 run: generate fmt vet manifests
 	go run cmd/controller/main.go
 
-# Install CRDs into a cluster
-install: manifests
-	kustomize build config/crd | kubectl apply -f -
-
-# Uninstall CRDs from a cluster
-uninstall: manifests
-	kustomize build config/crd | kubectl delete -f -
-
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests kustomize
-	cd config/manager && kustomize edit set image controller=${CONTROLLER_IMG}
-	kustomize build config/default | kubectl apply -f -
-
-# Generate manifests e.g. CRD, RBAC etc.
-manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=ks-schedule webhook paths="./api/..." output:crd:artifacts:config=config/crd/bases output:rbac:none
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=ks-schedule webhook paths="./pkg/..." output:crd:none
-
-install-crd:
-	kubectl apply -f config/crd/bases
-
 # Run go fmt against code
 fmt:
 	go fmt ./...
@@ -69,8 +48,8 @@ vet:
 lint:
 	golangci-lint run ./...
 
-# Generate code
-generate: controller-gen
+.PHONY: generate
+generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 clientset:
@@ -140,10 +119,36 @@ mock-gen:
 
 
 
+# Install CRDs into a cluster
+install: manifests
+	kustomize build config/crd | kubectl apply -f -
+
+# Uninstall CRDs from a cluster
+uninstall: manifests
+	kustomize build config/crd | kubectl delete -f -
+
+# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+deploy: manifests kustomize
+	cd config/manager && kustomize edit set image controller=${CONTROLLER_IMG}
+	kustomize build config/default | kubectl apply -f -
+
+# Generate manifests e.g. CRD, RBAC etc.
+#manifests: controller-gen
+#	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=ks-schedule webhook paths="./api/..." output:crd:artifacts:config=config/crd/bases output:rbac:none
+#	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=ks-schedule webhook paths="./pkg/..." output:crd:none
+.PHONY: manifests
+manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+
+
+
+install-crd:
+	kubectl apply -f config/crd/bases
+
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v4.5.5
-CONTROLLER_TOOLS_VERSION ?= v0.6.2
+KUSTOMIZE_VERSION ?= v0.9.2
+CONTROLLER_TOOLS_VERSION ?= v0.9.2
 
 # find or download controller-gen
 # download controller-gen if necessary

@@ -1,0 +1,12 @@
+apiVersion: schedule.kubesphere.io/v1alpha1
+kind: AnalysisTask
+metadata:
+  labels:
+    app.kubernetes.io/name: analysistask
+    app.kubernetes.io/instance: analysistask-sample
+    app.kubernetes.io/part-of: tmp
+    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: tmp
+  name: analysistask-sample
+spec:
+  # TODO(user): Add fields here
