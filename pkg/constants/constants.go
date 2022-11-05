@@ -22,7 +22,7 @@ const (
 	KubeSystemNamespace           = "kube-system"
 	ScheduleNamespace             = "schedule-system"
 	KubesphereScheduleNamespace   = "kubesphere-schedule-system"
-	KubesphereDevOpsNamespace     = "kubesphere-devops-system"
+	KubesphereScheduleElectionID  = "ks-controller-manager-leader-election"
 	IstioNamespace                = "istio-system"
 	KubeSphereMonitoringNamespace = "kubesphere-monitoring-system"
 	KubeSphereLoggingNamespace    = "kubesphere-logging-system"
@@ -151,7 +151,7 @@ const (
 )
 
 var (
-	SystemNamespaces = []string{KubeSphereNamespace, KubeSphereLoggingNamespace, KubeSphereMonitoringNamespace, ScheduleNamespace, KubeSystemNamespace, IstioNamespace, KubesphereDevOpsNamespace, PorterNamespace}
+	SystemNamespaces = []string{KubeSphereNamespace, KubeSphereLoggingNamespace, KubeSphereMonitoringNamespace, ScheduleNamespace, KubeSystemNamespace, IstioNamespace, KubesphereScheduleNamespace, PorterNamespace}
 )
 
 // K8SToken is the context key of k8s token

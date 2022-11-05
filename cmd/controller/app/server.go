@@ -19,8 +19,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"os"
-
 	"github.com/google/gops/agent"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +27,10 @@ import (
 	"k8s.io/component-base/term"
 	"k8s.io/klog"
 	"k8s.io/klog/klogr"
+	"kubesphere.io/schedule/pkg/constants"
+	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 
@@ -159,8 +160,8 @@ func run(s *options.KubeSphereControllerManagerOptions, ctx context.Context) err
 			CertDir:                 s.WebhookCertDir,
 			Port:                    8443,
 			LeaderElection:          s.LeaderElect,
-			LeaderElectionNamespace: "kubesphere-schedule-system",
-			LeaderElectionID:        "ks-controller-manager-leader-election",
+			LeaderElectionNamespace: constants.KubesphereScheduleNamespace,
+			LeaderElectionID:        constants.KubesphereScheduleElectionID,
 			LeaseDuration:           &s.LeaderElection.LeaseDuration,
 			RetryPeriod:             &s.LeaderElection.RetryPeriod,
 			RenewDeadline:           &s.LeaderElection.RenewDeadline,
@@ -196,6 +197,15 @@ func run(s *options.KubeSphereControllerManagerOptions, ctx context.Context) err
 	klog.V(0).Info("Starting cache resource from apiserver...")
 
 	informerFactory.Start(ctx.Done())
+
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		klog.Error(err, "unable to set up health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		klog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
 
 	klog.V(0).Info("Starting the controllers.")
 	if err = mgr.Start(ctx); err != nil {

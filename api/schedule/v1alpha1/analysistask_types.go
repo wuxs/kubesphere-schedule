@@ -83,7 +83,7 @@ type AnalysisTaskStatus struct {
 }
 
 // +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Result
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:shortName=analysis
 // +kubebuilder:subresource:status
@@ -98,7 +98,7 @@ type AnalysisTask struct {
 }
 
 //+kubebuilder:object:root=true
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Result
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // AnalysisList contains a list of Analysis
 type AnalysisTaskList struct {

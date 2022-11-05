@@ -65,9 +65,17 @@ type AnalysisTaskReconciler struct {
 	DeploymentIndexCache   map[string]*v1alpha1.AnalysisTask
 }
 
-//+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analysistask,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analysistask/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analysistask/finalizers,verbs=update
+//+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analysistasks,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analysistasks/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analysistasks/finalizers,verbs=update
+//+kubebuilder:rbac:groups=installer.kubesphere.io,resources=clusterconfigurations,verbs= get;list;watch;patch;update
+
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch
+//+kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
+
+//+kubebuilder:rbac:groups=analysis.crane.io,resources=analytics;recommendations,verbs= get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -361,11 +369,11 @@ func (r *AnalysisTaskReconciler) AnalyticsEventHandler() cache.ResourceEventHand
 			klog.V(4).Infof("reciver Analytics add event %v", o)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			o := newObj.(*cranev1alpha1.Analytics)
-			klog.Infof("reciver Analytics update event %v", o.Status.LastUpdateTime)
-			for _, comm := range o.Status.Recommendations {
-				klog.V(4).Infof("reciver Analytics update event %s: %s", comm.Name, comm.Message)
-			}
+			//o := newObj.(*cranev1alpha1.Analytics)
+			//klog.Infof("reciver Analytics update event %v:%v", o.ResourceVersion, o.Status.LastUpdateTime)
+			//for _, comm := range o.Status.Recommendations {
+			//	klog.V(4).Infof("reciver Analytics update event %s: %s", comm.Name, comm.Message)
+			//}
 		},
 		DeleteFunc: func(obj interface{}) {
 			o := obj.(*cranev1alpha1.Analytics)

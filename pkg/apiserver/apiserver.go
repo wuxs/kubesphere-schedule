@@ -213,18 +213,6 @@ func (s *APIServer) waitForResourceSync(ctx context.Context) error {
 	stopCh := ctx.Done()
 
 	ScheduleGVRs := map[schema.GroupVersion][]string{
-		//{Group:
-		//{Group: "analysis.crane.io", Version: "v1alpha1"}: {
-		//	"analytics",
-		//	"recommendations",
-		//},
-		//{Group: "application.kubesphere.io", Version: "v1alpha1"}: {
-		//	"helmapplicationversions",
-		//	"helmapplications",
-		//	"helmcategories",
-		//	"helmrepos",
-		//	"helmreleases",
-		//},
 		{Group: "schedule.kubesphere.io", Version: "v1alpha1"}: {
 			"analysistasks",
 		},
