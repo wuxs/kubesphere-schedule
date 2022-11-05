@@ -40,6 +40,15 @@ type ServerRunOptions struct {
 
 	// tls private key file
 	TlsPrivateKey string
+
+	// metrics bind address
+	MetricsBindAddress string
+
+	// health probe bind address
+	HealthzBindAddress string
+
+	// enable leader election
+	EnableLeaderElection bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -90,4 +99,11 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet, c *ServerRunOptions) {
 	fs.IntVar(&s.SecurePort, "secure-port", s.SecurePort, "secure port number")
 	fs.StringVar(&s.TlsCertFile, "tls-cert-file", c.TlsCertFile, "tls cert file")
 	fs.StringVar(&s.TlsPrivateKey, "tls-private-key", c.TlsPrivateKey, "tls private key")
+
+	fs.StringVar(&s.MetricsBindAddress, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	fs.StringVar(&s.HealthzBindAddress, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	fs.BoolVar(&s.EnableLeaderElection, "leader-elect", false,
+		"Enable leader election for controller manager. "+
+			"Enabling this will ensure there is only one active controller manager.")
+
 }

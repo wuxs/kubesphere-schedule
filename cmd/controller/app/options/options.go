@@ -19,6 +19,7 @@ package options
 import (
 	"flag"
 	"fmt"
+	genericoptions "kubesphere.io/schedule/pkg/server/options"
 	"strings"
 	"time"
 
@@ -41,9 +42,10 @@ type KubeSphereControllerManagerOptions struct {
 	KubernetesOptions *k8s.KubernetesOptions
 	ScheduleOptions   *schedule.Options
 
-	LeaderElect    bool
-	LeaderElection *leaderelection.LeaderElectionConfig
-	WebhookCertDir string
+	LeaderElect             bool
+	LeaderElection          *leaderelection.LeaderElectionConfig
+	GenericServerRunOptions *genericoptions.ServerRunOptions
+	WebhookCertDir          string
 
 	// KubeSphere is using sigs.k8s.io/application as fundamental object to implement Application Management.
 	// There are other projects also built on sigs.k8s.io/application, when KubeSphere installed along side
@@ -77,10 +79,11 @@ func NewKubeSphereControllerManagerOptions() *KubeSphereControllerManagerOptions
 			RenewDeadline: 15 * time.Second,
 			RetryPeriod:   5 * time.Second,
 		},
-		LeaderElect:         false,
-		WebhookCertDir:      "",
-		ApplicationSelector: "",
-		ControllerGates:     []string{"*"},
+		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
+		LeaderElect:             false,
+		WebhookCertDir:          "",
+		ApplicationSelector:     "",
+		ControllerGates:         []string{"*"},
 	}
 
 	return s
@@ -111,6 +114,7 @@ func (s *KubeSphereControllerManagerOptions) Flags(allControllerNameSelectors []
 		"A list of controllers to enable. '*' enables all on-by-default controllers, 'foo' enables the controller "+
 		"named 'foo', '-foo' disables the controller named 'foo'.\nAll controllers: %s",
 		strings.Join(allControllerNameSelectors, ", ")))
+	s.GenericServerRunOptions.AddFlags(gfs, s.GenericServerRunOptions)
 
 	gfs.BoolVar(&s.GOPSEnabled, "gops", s.GOPSEnabled, "Whether to enable gops or not.  When enabled this option, "+
 		"controller-manager will listen on a random port on 127.0.0.1, then you can use the gops tool to list and diagnose the controller-manager currently running.")

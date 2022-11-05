@@ -47,13 +47,8 @@ func NewControllerManagerCommand() *cobra.Command {
 	conf, err := controllerconfig.TryLoadFromDisk()
 	if err == nil {
 		// make sure LeaderElection is not nil
-		s = &options.KubeSphereControllerManagerOptions{
-			KubernetesOptions: conf.KubernetesOptions,
-			ScheduleOptions:   conf.ScheduleOptions,
-			LeaderElection:    s.LeaderElection,
-			LeaderElect:       s.LeaderElect,
-			WebhookCertDir:    s.WebhookCertDir,
-		}
+		s.KubernetesOptions = conf.KubernetesOptions
+		s.ScheduleOptions = conf.ScheduleOptions
 	} else {
 		klog.Fatal("Failed to load configuration from disk", err)
 	}
@@ -151,22 +146,30 @@ func run(s *options.KubeSphereControllerManagerOptions, ctx context.Context) err
 		kubernetesClient.Dynamic())
 
 	mgrOptions := manager.Options{
-		CertDir: s.WebhookCertDir,
-		Port:    8443,
+		CertDir:                s.WebhookCertDir,
+		Port:                   8443,
+		MetricsBindAddress:     s.GenericServerRunOptions.MetricsBindAddress,
+		HealthProbeBindAddress: s.GenericServerRunOptions.HealthzBindAddress,
 	}
 
 	if s.LeaderElect {
-		mgrOptions = manager.Options{
-			CertDir:                 s.WebhookCertDir,
-			Port:                    8443,
-			LeaderElection:          s.LeaderElect,
-			LeaderElectionNamespace: constants.KubesphereScheduleNamespace,
-			LeaderElectionID:        constants.KubesphereScheduleElectionID,
-			LeaseDuration:           &s.LeaderElection.LeaseDuration,
-			RetryPeriod:             &s.LeaderElection.RetryPeriod,
-			RenewDeadline:           &s.LeaderElection.RenewDeadline,
-		}
+		mgrOptions.LeaderElection = s.LeaderElect
+		mgrOptions.LeaderElectionNamespace = constants.KubesphereScheduleNamespace
+		mgrOptions.LeaderElectionID = constants.KubesphereScheduleElectionID
+		mgrOptions.LeaseDuration = &s.LeaderElection.LeaseDuration
+		mgrOptions.RetryPeriod = &s.LeaderElection.RetryPeriod
+		mgrOptions.RenewDeadline = &s.LeaderElection.RenewDeadline
 	}
+
+	/*
+
+		Scheme:                 scheme,
+		MetricsBindAddress:     metricsAddr,
+		Port:                   9443,
+		HealthProbeBindAddress: probeAddr,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "fa68b2a3.kubesphere.io",
+	*/
 
 	klog.V(0).Info("setting up manager")
 	ctrl.SetLogger(klogr.New())
