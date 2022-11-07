@@ -27,18 +27,14 @@ rules:
   - coordination.k8s.io
   resources:
   - leases
-  resourceNames:
-  - ks-controller-manager-leader-election
   verbs:
   - get
+  - list
+  - watch
+  - create
   - update
   - patch
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - create
+  - delete
 - apiGroups:
   - ""
   resources:

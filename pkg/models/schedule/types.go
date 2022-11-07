@@ -13,11 +13,15 @@ limitations under the License.
 
 package schedule
 
+type AnalysisTaskConfig struct {
+	MemNotifyPresent *int64 `json:"mem_notify_present,omitempty"`
+	CPUNotifyPresent *int64 `json:"cpu_notify_present,omitempty"`
+}
+
 type SchedulerConfig struct {
 	// name of the default scheduler
-	Scheduler        *string `json:"scheduler,omitempty"`
-	MemNotifyPresent *int64  `json:"mem_notify_present,omitempty"`
-	CPUNotifyPresent *int64  `json:"cpu_notify_present,omitempty"`
+	SchedulerList []string `json:"scheduler_list,omitempty"`
+	Scheduler     *string  `json:"scheduler,omitempty"`
 }
 
 const (

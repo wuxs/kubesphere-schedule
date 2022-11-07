@@ -18,7 +18,7 @@ package v1alpha1
 
 import (
 	cranev1 "github.com/gocrane/api/analysis/v1alpha1"
-	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,9 +26,32 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-	ResourceTypeDeployment string = "Deployment"
-	ResourceTypeNamespace  string = "Namespace"
+	NamespaceResourceType string = "Namespace"
+	WorkloadResourceType  string = "Workload"
+
+	DeploymentResource  string = "Deployment"
+	StatefulSetResource string = "StatefulSet"
+	DaemonSetResource   string = "DaemonSet"
+	ReplicaSetResource  string = "ReplicaSet"
+
+	PendingStatus string = "pending"
+	RunningStatus string = "running"
+	SuccessStatus string = "success"
+	FailedStatus  string = "failed"
+	ErrorStatus   string = "Error"
 )
+
+type ClusterScheduleConfig struct {
+	Enable           bool     `json:"enable,omitempty"`
+	DefaultScheduler string   `json:"defaultScheduler,omitempty"`
+	Sschedulers      []string `json:"schedulers,omitempty"`
+	Analysis         struct {
+		NotifyThreshold struct {
+			Mem int64 `json:"mem,omitempty"`
+			CPU int64 `json:"cpu,omitempty"`
+		} `json:"notifyThreshold,omitempty"`
+	} `json:"analysis,omitempty"`
+}
 
 // ResourceSelector describes how the resources will be selected.
 type ResourceSelector struct {
@@ -66,6 +89,11 @@ type AnalysisTaskSpec struct {
 type AnalysisTaskStatus struct {
 	// Status is the status of AnalysisTask.
 	// Status is one of: "Pending", "Running", "Succeeded", "Failed", "Error", "Unknown"
+	// - "Pending": started but not running yet.
+	// - "Running": running.
+	// - "Succeeded": completed successfully.
+	// - "Failed": completed with errors.
+	// - "Error": error occurred.
 	// +optional
 	Status string `json:"status,omitempty"`
 
@@ -77,9 +105,20 @@ type AnalysisTaskStatus struct {
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
+	// TargetNamespaces is an array of current analytics conditions.
+	// +optional
+	// +kubebuilder:pruning:PreserveUnknownFields
+	TargetNamespaces []corev1.ObjectReference `json:"targetNamespaces,omitempty"`
+
+	// TargetStatefulSets is an array of current analytics conditions.
+	// +optional
+	// +kubebuilder:pruning:PreserveUnknownFields
+	TargetStatefulSets []corev1.ObjectReference `json:"targetStatefulSets,omitempty"`
+
 	// TargetDeployments is an array of current analytics conditions.
 	// +optional
-	TargetDeployments map[string]*appsv1.Deployment `json:"targetDeployments,omitempty"`
+	// +kubebuilder:pruning:PreserveUnknownFields
+	TargetDeployments []corev1.ObjectReference `json:"targetDeployments,omitempty"`
 }
 
 // +genclient

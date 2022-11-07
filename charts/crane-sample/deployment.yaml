@@ -21,7 +21,7 @@ spec:
       containers:
         - name: stress
           image: docker.io/gocrane/stress:latest
-          command: ["stress", "-c", "1"]
+          command: [ "stress", "-c", "1" ]
           resources:
             requests:
               memory: "1Gi"
@@ -29,3 +29,7 @@ spec:
             limits:
               memory: "1Gi"
               cpu: "1"
+        - name: nginx
+          image: nginx:1.14.2
+          ports:
+            - containerPort: 80

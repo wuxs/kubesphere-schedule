@@ -23,6 +23,7 @@ import (
 	"kubesphere.io/schedule/pkg/models/schedule"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"kubesphere.io/schedule/cmd/controller/app/options"
 	"kubesphere.io/schedule/pkg/controller/schedule/analysis"
@@ -40,37 +41,33 @@ func addAllControllers(mgr manager.Manager, client k8s.Client, informerFactory i
 	cmOptions *options.KubeSphereControllerManagerOptions,
 	stopCh <-chan struct{}) error {
 
-	////////////////////////////////////
-	// begin init necessary informers
-	////////////////////////////////////
-	// kubernetesInformer := informerFactory.KubernetesSharedInformerFactory()
-	// kubesphereInformer := informerFactory.KubeSphereSharedInformerFactory()
-	////////////////////////////////////
-	// end informers
-	////////////////////////////////////
-
-	////////////////////////////////////////////////////////
-	// begin init controller and add to manager one by one
-	////////////////////////////////////////////////////////
-
 	// "analysis" controller
 	// if cmOptions.IsControllerEnabled("analysis") && !cmOptions.GatewayOptions.IsEmpty(){
 
 	scheduleClient := schedule.NewScheduleOperator(informerFactory, client.Kubernetes(), client.Schedule(), client.ExtResources(), client.Dynamic(), stopCh)
 	analysisReconciler := &analysis.AnalysisTaskReconciler{
-		Client:                 mgr.GetClient(),
-		K8SClient:              client,
-		ScheduleClient:         scheduleClient,
-		DeploymentInformer:     informerFactory.KubernetesSharedInformerFactory().Apps().V1().Deployments(),
-		NamespaceInformer:      informerFactory.KubernetesSharedInformerFactory().Core().V1().Namespaces(),
-		AnalyticsInformer:      informerFactory.CraneInformer().Analysis().V1alpha1().Analytics(),
-		RecommendationInformer: informerFactory.CraneInformer().Analysis().V1alpha1().Recommendations(),
-		DynamicInformer:        informerFactory.DynamicSharedInformerFactory(),
-		SchedulerConfig:        schedule.SchedulerConfig{},
-		NameSpaceCache:         make(map[string]*v1alpha1.AnalysisTask),
-		DeploymentIndexCache:   make(map[string]*v1alpha1.AnalysisTask),
+		Client:                     mgr.GetClient(),
+		K8SClient:                  client,
+		ScheduleClient:             scheduleClient,
+		DeploymentInformer:         informerFactory.KubernetesSharedInformerFactory().Apps().V1().Deployments(),
+		NamespaceInformer:          informerFactory.KubernetesSharedInformerFactory().Core().V1().Namespaces(),
+		AnalyticsInformer:          informerFactory.CraneInformer().Analysis().V1alpha1().Analytics(),
+		RecommendationInformer:     informerFactory.CraneInformer().Analysis().V1alpha1().Recommendations(),
+		DynamicInformer:            informerFactory.DynamicSharedInformerFactory(),
+		ClusterScheduleConfig:      &v1alpha1.ClusterScheduleConfig{},
+		NameSpaceAnalysisTaskCache: make(map[string]*v1alpha1.AnalysisTask),
+		NameSpaceReverseIndex:      map[string]map[string]*v1alpha1.AnalysisTask{},
 	}
 	addControllerWithSetup(mgr, "analysis", analysisReconciler)
+
+	// Setup webhooks
+	klog.Info("setting up webhook server")
+	hookServer := mgr.GetWebhookServer()
+	mgr.GetFieldIndexer()
+
+	klog.Info("registering webhooks to the webhook server")
+	hookServer.Register("/mutate", &webhook.Admission{Handler: &analysis.Mutating{AnalysisTaskReconciler: analysisReconciler}})
+	hookServer.Register("/validate", &webhook.Admission{Handler: &analysis.Validating{AnalysisTaskReconciler: analysisReconciler}})
 
 	// log all controllers process result
 	for _, name := range allControllers {

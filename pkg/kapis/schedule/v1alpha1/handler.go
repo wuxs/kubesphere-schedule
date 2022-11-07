@@ -60,24 +60,18 @@ func (h *scheduleHandler) ListScheduler(request *restful.Request, response *rest
 
 func (h *scheduleHandler) ModifyScheduler(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
-	namespaceID := request.PathParameter("namespace")
-	var analysisTask *v1alpha1.AnalysisTask
-	err := request.ReadEntity(&analysisTask)
+	var schedulerConfig *schedule.SchedulerConfig
+	err := request.ReadEntity(&schedulerConfig)
 	if err != nil {
 		klog.V(4).Infoln(err)
 		api.HandleBadRequest(response, nil, err)
 		return
 	}
 
-	if analysisTask.Spec.Type != v1alpha1.ResourceTypeDeployment {
-		klog.V(4).Infoln(ErrScheduleTypeNil)
-		api.HandleBadRequest(response, nil, ErrScheduleTypeNil)
-		return
-	}
-
-	Result(h.schedule.CreateAnalysisTask(ctx, namespaceID, analysisTask)).
-		Output(request, response, "create deployment analysis task %s", analysisTask.Name)
+	Result(h.schedule.ModifySchedulerConfig(ctx, schedulerConfig)).
+		Output(request, response, "modify scheduler config: ", schedulerConfig)
 }
+
 func (h *scheduleHandler) ListAnalysisTask(request *restful.Request, response *restful.Response) {
 	//analysis := request.PathParameter("analysis")
 	ctx := request.Request.Context()
@@ -88,7 +82,7 @@ func (h *scheduleHandler) ListAnalysisTask(request *restful.Request, response *r
 	}
 }
 
-func (h *scheduleHandler) CreateAnalysis(request *restful.Request, response *restful.Response) {
+func (h *scheduleHandler) CreateWorkloadAnalysis(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
 	namespaceID := request.PathParameter("namespace")
 	var analysisTask *v1alpha1.AnalysisTask
@@ -99,7 +93,7 @@ func (h *scheduleHandler) CreateAnalysis(request *restful.Request, response *res
 		return
 	}
 
-	if analysisTask.Spec.Type != v1alpha1.ResourceTypeDeployment {
+	if analysisTask.Spec.Type != v1alpha1.WorkloadResourceType {
 		klog.V(4).Infoln(ErrScheduleTypeNil)
 		api.HandleBadRequest(response, nil, ErrScheduleTypeNil)
 		return
@@ -119,7 +113,7 @@ func (h *scheduleHandler) CreateNamespaceAnalysis(request *restful.Request, resp
 		return
 	}
 
-	if analysisTask.Spec.Type != v1alpha1.ResourceTypeNamespace {
+	if analysisTask.Spec.Type != v1alpha1.NamespaceResourceType {
 		klog.V(4).Infoln(ErrScheduleTypeNil)
 		api.HandleBadRequest(response, nil, ErrScheduleTypeNil)
 		return
@@ -165,7 +159,7 @@ func (h *scheduleHandler) DeleteAnalysisTask(request *restful.Request, response 
 
 func (h *scheduleHandler) ModifyAnalysisTaskConfig(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
-	var analysisConfig *schedule.SchedulerConfig
+	var analysisConfig *schedule.AnalysisTaskConfig
 	err := request.ReadEntity(&analysisConfig)
 	if err != nil {
 		klog.V(4).Infoln(err)

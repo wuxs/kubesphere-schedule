@@ -123,7 +123,7 @@ func AddToContainer(c *restful.Container, ksInfomrers informers.InformerFactory,
 	//创建分析任务 POST /analysis @TODO
 	webservice.Route(webservice.POST("/namespaces/{namespace}/analysis").
 		Deprecate().
-		To(handler.CreateAnalysis).
+		To(handler.CreateWorkloadAnalysis).
 		Doc("Create a new app template version").
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.ScheduleTag}).
 		Reads(v1alpha1.AnalysisTask{}).

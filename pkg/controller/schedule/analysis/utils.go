@@ -21,6 +21,7 @@ import (
 	cranev1alpha1 "github.com/gocrane/api/analysis/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 	schedulev1alpha1 "kubesphere.io/schedule/api/schedule/v1alpha1"
 	"kubesphere.io/schedule/pkg/constants"
 	"reflect"
@@ -53,23 +54,36 @@ func IsNil(v interface{}) bool {
 	}
 }
 
-func convertResource(deployment *appsv1.Deployment) schedulev1alpha1.ResourceSelector {
+func convertResource(workload interface{}) schedulev1alpha1.ResourceSelector {
 	gv := appsv1.SchemeGroupVersion
-	return schedulev1alpha1.ResourceSelector{
-		Kind:       gv.WithKind("Deployment").Kind,
-		APIVersion: gv.String(),
-		Name:       deployment.Name,
+	switch workload := (workload).(type) {
+	case *appsv1.Deployment:
+		return schedulev1alpha1.ResourceSelector{
+			Kind:       gv.WithKind("Deployment").Kind,
+			APIVersion: gv.String(),
+			Name:       workload.Name,
+		}
+	case *appsv1.StatefulSet:
+		return schedulev1alpha1.ResourceSelector{
+			Kind:       gv.WithKind("StatefulSet").Kind,
+			APIVersion: gv.String(),
+			Name:       workload.Name,
+		}
+	case *appsv1.DaemonSet:
+		return schedulev1alpha1.ResourceSelector{
+			Kind:       gv.WithKind("DaemonSet").Kind,
+			APIVersion: gv.String(),
+			Name:       workload.Name,
+		}
+	default:
+		klog.Errorf("unsupported workload type %v", workload)
+		return schedulev1alpha1.ResourceSelector{}
 	}
-}
-
-func deploymentIndexKey(namespace, name string) string {
-	return fmt.Sprintf("%s/deployment/%s", namespace, name)
 }
 
 var getQKV = apiutil.GVKForObject
 
-func convertAnalytics(prefix string, target schedulev1alpha1.ResourceSelector, strategy cranev1alpha1.CompletionStrategy) (name string, analytics *cranev1alpha1.Analytics) {
-	name = strings.ToLower(fmt.Sprintf("kubesphere-%s-%s", prefix, target.Name))
+func convertAnalytics(name string, target schedulev1alpha1.ResourceSelector, strategy cranev1alpha1.CompletionStrategy) (analytics *cranev1alpha1.Analytics) {
 	analytics = &cranev1alpha1.Analytics{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -82,7 +96,7 @@ func convertAnalytics(prefix string, target schedulev1alpha1.ResourceSelector, s
 			CompletionStrategy: strategy,
 		},
 	}
-	return analytics.Name, analytics
+	return analytics
 }
 
 // labelAnalyticsWithAnalysisName adds a kubesphere.io/analysis=[analysisName] label to crane.analysis
@@ -90,8 +104,14 @@ func labelAnalyticsWithAnalysisName(analytics *cranev1alpha1.Analytics, analysis
 	if analytics.Labels == nil {
 		analytics.Labels = make(map[string]string, 0)
 	}
-
-	analytics.Labels[constants.AnalysisLabel] = analysisTask.Name
-
+	analytics.Labels[constants.AnalysisTaskAnnotationLabel] = analysisTask.Name
 	return analytics
+}
+
+func genWorkloadIndexKey(namespace, kind, name string) string {
+	return strings.ToLower(fmt.Sprintf("%s/%s/%s", namespace, kind, name))
+}
+
+func genAnalysisName(taskKind, kind, name string) string {
+	return strings.ToLower(fmt.Sprintf("kubesphere-%s-%s-%s", taskKind, kind, name))
 }

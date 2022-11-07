@@ -17,6 +17,7 @@ limitations under the License.
 package jsonpath
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/mdaverde/jsonpath"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -74,4 +75,37 @@ func (o *Object) GetFloat64(path string) (float64, error) {
 		return 0, err
 	}
 	return ret, nil
+}
+
+//func (o *Object) GetStringList(path string) ([]string, error) {
+//	ret, err := jsonpath.Get(o.data, path)
+//	if err != nil {
+//		return []string{}, err
+//	}
+//	switch ret := ret.(type) {
+//	case []interface{}:
+//		fmt.Println(ret)
+//	case Object:
+//	default:
+//
+//	}
+//	//return fmt.Sprint(ret), nil
+//}
+
+func (o *Object) DataAs(path string, entry interface{}) error {
+	elem, err := o.Get(path)
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(elem)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(data, &entry)
+	if err != nil {
+		err = fmt.Errorf("unmarshal  <%s> to data error: %w", path, err)
+		return err
+	}
+	return nil
 }

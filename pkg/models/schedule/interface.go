@@ -22,6 +22,7 @@ import (
 	cranealpha1 "github.com/gocrane/api/analysis/v1alpha1"
 	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
 	"github.com/mdaverde/jsonpath"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,7 +61,10 @@ type Operator interface {
 	ModifyAnalysisTask(ctx context.Context, namespace, id string, task *v1alpha1.AnalysisTask) error
 	DescribeAnalysisTask(ctx context.Context, namespace, id string) (*v1alpha1.AnalysisTask, error)
 	DeleteAnalysisTask(ctx context.Context, namespace, id string) error
-	ModifyAnalysisTaskConfig(ctx context.Context, schedule *SchedulerConfig) (*SchedulerConfig, error)
+	ModifyAnalysisTaskConfig(ctx context.Context, schedule *AnalysisTaskConfig) (*AnalysisTaskConfig, error)
+
+	//Scheduler
+	ModifySchedulerConfig(ctx context.Context, config *SchedulerConfig) (*SchedulerConfig, error)
 
 	//Crane
 	CreateCraneAnalysis(ctx context.Context, namespace string, name string, analytics *cranealpha1.Analytics) error
@@ -99,47 +103,99 @@ func (s *scheduleOperator) DeleteAnalysisTask(ctx context.Context, namespace, id
 	return s.scheduleClient.ScheduleV1alpha1().AnalysisTasks(namespace).Delete(ctx, id, metav1.DeleteOptions{})
 }
 
-func (s *scheduleOperator) ModifyAnalysisTaskConfig(ctx context.Context, config *SchedulerConfig) (*SchedulerConfig, error) {
-
+func (s *scheduleOperator) ModifyAnalysisTaskConfig(ctx context.Context, config *AnalysisTaskConfig) (*AnalysisTaskConfig, error) {
 	gvr := schema.GroupVersionResource{Group: "installer.kubesphere.io", Version: "v1alpha1", Resource: "clusterconfigurations"}
 
 	ksConfig, err := s.dynamicClient.Resource(gvr).Namespace(constants.KubeSphereNamespace).
 		Get(ctx, constants.KsClusterConfigurationInstallerName, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			klog.Error(err, "Failed to get clusterconfigurations for install ks in dolphincluster")
-			return nil, err
+			return nil, fmt.Errorf("Failed to get cluster configurations for install ks in %s: %w", constants.KubeSphereNamespace, err)
 		}
 	}
 
 	ksConfigCopy := ksConfig.DeepCopy()
-	fmt.Println(jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.analysis.notifyThreshold"))
 	if config.CPUNotifyPresent != nil {
-		jsonpath.Set(ksConfigCopy.Object, "spec.schedule.analysis.notifyThreshold.cpu", config.CPUNotifyPresent)
+		val, err := jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.analysis.notifyThreshold.cpu")
+		if err == nil {
+			jsonpath.Set(ksConfigCopy.Object, "spec.schedule.analysis.notifyThreshold.cpu", config.CPUNotifyPresent)
+			klog.V(4).Infof("update analysis notify cpu threshold,old : %v, new %v", val, config.CPUNotifyPresent)
+		} else {
+			return nil, fmt.Errorf("failed to update analysis notify cpu threshold: %w", err)
+		}
 	}
 	if config.MemNotifyPresent != nil {
-		jsonpath.Set(ksConfigCopy.Object, "spec.schedule.analysis.notifyThreshold.mem", config.MemNotifyPresent)
+		val, err := jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.analysis.notifyThreshold.mem")
+		if err == nil {
+			jsonpath.Set(ksConfigCopy.Object, "spec.schedule.analysis.notifyThreshold.mem", config.MemNotifyPresent)
+			klog.V(4).Infof("update analysis notify mem threshold,old : %v, new %v", val, config.MemNotifyPresent)
+		} else {
+			return nil, fmt.Errorf("failed to update analysis notify mem threshold: %w", err)
+		}
 	}
-	fmt.Println(jsonpath.Get(ksConfigCopy.Object, "spec.schedule.analysis.notifyThreshold"))
 
 	patch := client.MergeFrom(ksConfig)
 	data, err := patch.Data(ksConfigCopy)
 	if err != nil {
-		klog.Error("create patch failed", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create patch: %w", err)
 	}
 
 	// data == "{}", need not to patch
 	if len(data) == 2 {
-		return nil, err
+		return config, nil
 	}
 
 	_, err = s.dynamicClient.Resource(gvr).Namespace(constants.KubeSphereNamespace).
 		Patch(ctx, constants.KsClusterConfigurationInstallerName, patch.Type(), data, metav1.PatchOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			klog.Error(err, "Failed to get clusterconfigurations for install ks in dolphincluster")
-			return nil, err
+			return nil, fmt.Errorf("Failed to update cluster configurations for install ks in %s: %w", constants.KubeSphereNamespace, err)
+		}
+	}
+
+	return config, nil
+}
+
+func (s *scheduleOperator) ModifySchedulerConfig(ctx context.Context, config *SchedulerConfig) (*SchedulerConfig, error) {
+	if config.Scheduler != nil {
+		err := fmt.Errorf("Failed to update default scheduler, config.Scheduler is nil")
+		return nil, err
+	}
+
+	gvr := schema.GroupVersionResource{Group: "installer.kubesphere.io", Version: "v1alpha1", Resource: "clusterconfigurations"}
+	ksConfig, err := s.dynamicClient.Resource(gvr).Namespace(constants.KubeSphereNamespace).
+		Get(ctx, constants.KsClusterConfigurationInstallerName, metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to get cluster configurations for install ks in %s: %w", constants.KubeSphereNamespace, err)
+		}
+	}
+
+	ksConfigCopy := ksConfig.DeepCopy()
+	val, err := jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.defaultScheduler")
+	if err == nil {
+		jsonpath.Set(ksConfigCopy.Object, "spec.scheduler.defaultScheduler", config.Scheduler)
+		klog.V(4).Infof("update default scheduler,old : %v, new %v", val, config.Scheduler)
+	} else {
+		return nil, fmt.Errorf("failed to update default scheduler: %w", err)
+	}
+
+	patch := client.MergeFrom(ksConfig)
+	data, err := patch.Data(ksConfigCopy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create patch: %w", err)
+	}
+
+	// data == "{}", need not to patch
+	if len(data) == 2 {
+		return config, nil
+	}
+
+	_, err = s.dynamicClient.Resource(gvr).Namespace(constants.KubeSphereNamespace).
+		Patch(ctx, constants.KsClusterConfigurationInstallerName, patch.Type(), data, metav1.PatchOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to update cluster configurations for install ks in %s: %w", constants.KubeSphereNamespace, err)
 		}
 	}
 
@@ -208,10 +264,94 @@ func (s *scheduleOperator) ListAnalysisTask(ctx context.Context, query *query.Qu
 		return api.ListResult{}, err
 	}
 	var result = make([]runtime.Object, len(tasks.Items))
-	for i, _ := range tasks.Items {
-		result = append(result, &tasks.Items[i])
+	for _, item := range tasks.Items {
+		if item.Spec.Type == v1alpha1.WorkloadResourceType {
+			item.Status.TargetDeployments = s.GetDeployments(item)
+			item.Status.TargetDeployments = s.GetStatefulSets(item)
+		}
+		if item.Spec.Type == v1alpha1.NamespaceResourceType {
+			item.Status.TargetNamespaces = s.GetNamespaces(item)
+		}
 	}
-
 	return *resourcesV1alpha3.DefaultList(result, query, resourcesV1alpha3.DefaultCompare(), resourcesV1alpha3.DefaultFilter()), nil
 
+}
+
+func (s *scheduleOperator) GetDeployments(item v1alpha1.AnalysisTask) []corev1.ObjectReference {
+	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{
+		constants.AnalysisTaskWorkloadAnnotationLabel: item.Name,
+	}}
+	listOptions := metav1.ListOptions{
+		LabelSelector: labelSelector.String(),
+	}
+
+	ret, err := s.k8sClient.AppsV1().Deployments(item.Namespace).List(context.Background(), listOptions)
+	if err != nil {
+		klog.Error(err)
+	} else {
+		var result = make([]corev1.ObjectReference, len(ret.Items))
+		for _, workload := range ret.Items {
+			result = append(result, corev1.ObjectReference{
+				APIVersion: workload.APIVersion,
+				Kind:       workload.Kind,
+				Name:       workload.Name,
+				Namespace:  workload.Namespace,
+			})
+		}
+		return result
+	}
+	return []corev1.ObjectReference{}
+}
+
+func (s *scheduleOperator) GetStatefulSets(item v1alpha1.AnalysisTask) []corev1.ObjectReference {
+
+	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{
+		constants.AnalysisTaskWorkloadAnnotationLabel: item.Name,
+	}}
+	listOptions := metav1.ListOptions{
+		LabelSelector: labelSelector.String(),
+	}
+
+	ret, err := s.k8sClient.AppsV1().StatefulSets(item.Namespace).List(context.Background(), listOptions)
+	if err != nil {
+		klog.Error(err)
+	} else {
+		var result = make([]corev1.ObjectReference, len(ret.Items))
+		for _, workload := range ret.Items {
+			result = append(result, corev1.ObjectReference{
+				APIVersion: workload.APIVersion,
+				Kind:       workload.Kind,
+				Name:       workload.Name,
+				Namespace:  workload.Namespace,
+			})
+		}
+		return result
+	}
+	return []corev1.ObjectReference{}
+}
+
+func (s *scheduleOperator) GetNamespaces(item v1alpha1.AnalysisTask) []corev1.ObjectReference {
+	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{
+		constants.AnalysisTaskWorkloadAnnotationLabel: item.Name,
+	}}
+	listOptions := metav1.ListOptions{
+		LabelSelector: labelSelector.String(),
+	}
+
+	ret, err := s.k8sClient.CoreV1().Namespaces().List(context.Background(), listOptions)
+	if err != nil {
+		klog.Error(err)
+	} else {
+		var result = make([]corev1.ObjectReference, len(ret.Items))
+		for _, workload := range ret.Items {
+			result = append(result, corev1.ObjectReference{
+				APIVersion: workload.APIVersion,
+				Kind:       workload.Kind,
+				Name:       workload.Name,
+				Namespace:  workload.Namespace,
+			})
+		}
+		return result
+	}
+	return []corev1.ObjectReference{}
 }
