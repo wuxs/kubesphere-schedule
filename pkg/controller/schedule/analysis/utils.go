@@ -20,9 +20,8 @@ import (
 	"fmt"
 	cranev1alpha1 "github.com/gocrane/api/analysis/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
-	schedulev1alpha1 "kubesphere.io/schedule/api/schedule/v1alpha1"
 	"kubesphere.io/schedule/pkg/constants"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -54,36 +53,69 @@ func IsNil(v interface{}) bool {
 	}
 }
 
-func convertResource(workload interface{}) schedulev1alpha1.ResourceSelector {
+func Label(labels map[string]string, name string) string {
+	if labels == nil {
+		return ""
+	}
+	if label, ok := labels[name]; ok {
+		return label
+	}
+	return ""
+}
+
+func getObjectReference(workload interface{}) corev1.ObjectReference {
 	gv := appsv1.SchemeGroupVersion
 	switch workload := (workload).(type) {
 	case *appsv1.Deployment:
-		return schedulev1alpha1.ResourceSelector{
+		return corev1.ObjectReference{
 			Kind:       gv.WithKind("Deployment").Kind,
 			APIVersion: gv.String(),
 			Name:       workload.Name,
+			Namespace:  workload.Namespace,
+		}
+	case appsv1.Deployment:
+		return corev1.ObjectReference{
+			Kind:       gv.WithKind("Deployment").Kind,
+			APIVersion: gv.String(),
+			Name:       workload.Name,
+			Namespace:  workload.Namespace,
 		}
 	case *appsv1.StatefulSet:
-		return schedulev1alpha1.ResourceSelector{
+		return corev1.ObjectReference{
 			Kind:       gv.WithKind("StatefulSet").Kind,
 			APIVersion: gv.String(),
 			Name:       workload.Name,
+			Namespace:  workload.Namespace,
+		}
+	case appsv1.StatefulSet:
+		return corev1.ObjectReference{
+			Kind:       gv.WithKind("StatefulSet").Kind,
+			APIVersion: gv.String(),
+			Name:       workload.Name,
+			Namespace:  workload.Namespace,
 		}
 	case *appsv1.DaemonSet:
-		return schedulev1alpha1.ResourceSelector{
+		return corev1.ObjectReference{
 			Kind:       gv.WithKind("DaemonSet").Kind,
 			APIVersion: gv.String(),
 			Name:       workload.Name,
+			Namespace:  workload.Namespace,
+		}
+	case appsv1.DaemonSet:
+		return corev1.ObjectReference{
+			Kind:       gv.WithKind("DaemonSet").Kind,
+			APIVersion: gv.String(),
+			Name:       workload.Name,
+			Namespace:  workload.Namespace,
 		}
 	default:
-		klog.Errorf("unsupported workload type %v", workload)
-		return schedulev1alpha1.ResourceSelector{}
+		panic("unsupported workload type")
 	}
 }
 
 var getQKV = apiutil.GVKForObject
 
-func convertAnalytics(name string, target schedulev1alpha1.ResourceSelector, strategy cranev1alpha1.CompletionStrategy) (analytics *cranev1alpha1.Analytics) {
+func convertAnalytics(name string, target corev1.ObjectReference, strategy cranev1alpha1.CompletionStrategy) (analytics *cranev1alpha1.Analytics) {
 	analytics = &cranev1alpha1.Analytics{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -100,18 +132,22 @@ func convertAnalytics(name string, target schedulev1alpha1.ResourceSelector, str
 }
 
 // labelAnalyticsWithAnalysisName adds a kubesphere.io/analysis=[analysisName] label to crane.analysis
-func labelAnalyticsWithAnalysisName(analytics *cranev1alpha1.Analytics, analysisTask *schedulev1alpha1.AnalysisTask) *cranev1alpha1.Analytics {
+func labelAnalyticsWithAnalysisName(analytics *cranev1alpha1.Analytics, analysisTaskName string) *cranev1alpha1.Analytics {
 	if analytics.Labels == nil {
 		analytics.Labels = make(map[string]string, 0)
 	}
-	analytics.Labels[constants.AnalysisTaskAnnotationLabel] = analysisTask.Name
+	analytics.Labels[constants.AnalysisTaskLabelKey] = analysisTaskName
 	return analytics
 }
 
-func genWorkloadIndexKey(namespace, kind, name string) string {
-	return strings.ToLower(fmt.Sprintf("%s/%s/%s", namespace, kind, name))
+func genAnalysisTaskIndexKey(namespace, name string) string {
+	return strings.ToLower(fmt.Sprintf("%s/%s", namespace, name))
 }
 
 func genAnalysisName(taskKind, kind, name string) string {
 	return strings.ToLower(fmt.Sprintf("kubesphere-%s-%s-%s", taskKind, kind, name))
+}
+
+func genWorkloadName(kind, name string) string {
+	return strings.ToLower(fmt.Sprintf("%s/%s", kind, name))
 }

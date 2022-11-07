@@ -26,7 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (s *scheduleOperator) CreateCraneAnalysis(ctx context.Context, namespace string, name string, new *cranealpha1.Analytics) error {
+func (s *scheduleOperator) CreateCraneAnalysis(ctx context.Context, namespace string, new *cranealpha1.Analytics) error {
+	name := new.Name
 	analytics, err := s.resClient.AnalysisV1alpha1().Analytics(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) { //creat
 		_, err := s.resClient.AnalysisV1alpha1().Analytics(namespace).Create(context.Background(), new, metav1.CreateOptions{})
@@ -63,7 +64,7 @@ func (s *scheduleOperator) CreateCraneAnalysis(ctx context.Context, namespace st
 
 }
 
-func (s *scheduleOperator) DeleteCraneAnalysis(ctx context.Context, namespace string, name string, analytics *cranealpha1.Analytics) error {
+func (s *scheduleOperator) DeleteCraneAnalysis(ctx context.Context, namespace string, name string) error {
 	err := s.resClient.AnalysisV1alpha1().Analytics(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil

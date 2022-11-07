@@ -67,8 +67,8 @@ type Operator interface {
 	ModifySchedulerConfig(ctx context.Context, config *SchedulerConfig) (*SchedulerConfig, error)
 
 	//Crane
-	CreateCraneAnalysis(ctx context.Context, namespace string, name string, analytics *cranealpha1.Analytics) error
-	DeleteCraneAnalysis(ctx context.Context, namespace string, name string, analytics *cranealpha1.Analytics) error
+	CreateCraneAnalysis(ctx context.Context, namespace string, analytics *cranealpha1.Analytics) error
+	DeleteCraneAnalysis(ctx context.Context, namespace string, name string) error
 }
 
 func NewScheduleOperator(ksInformers ks_informers.InformerFactory,
@@ -278,7 +278,7 @@ func (s *scheduleOperator) ListAnalysisTask(ctx context.Context, query *query.Qu
 
 func (s *scheduleOperator) GetDeployments(item v1alpha1.AnalysisTask) []corev1.ObjectReference {
 	labelSelect := (&client.ListOptions{}).ApplyOptions([]client.ListOption{
-		client.MatchingLabels{constants.AnalysisTaskAnnotationLabel: item.Name},
+		client.MatchingLabels{constants.AnalysisTaskLabelKey: item.Name},
 	})
 	ret, err := s.k8sClient.AppsV1().Deployments(item.Namespace).List(context.Background(), *labelSelect.AsListOptions())
 	if err != nil {
@@ -300,7 +300,7 @@ func (s *scheduleOperator) GetDeployments(item v1alpha1.AnalysisTask) []corev1.O
 
 func (s *scheduleOperator) GetStatefulSets(item v1alpha1.AnalysisTask) []corev1.ObjectReference {
 	labelSelect := (&client.ListOptions{}).ApplyOptions([]client.ListOption{
-		client.MatchingLabels{constants.AnalysisTaskAnnotationLabel: item.Name},
+		client.MatchingLabels{constants.AnalysisTaskLabelKey: item.Name},
 	})
 	ret, err := s.k8sClient.AppsV1().StatefulSets(item.Namespace).List(context.Background(), *labelSelect.AsListOptions())
 	if err != nil {
@@ -322,7 +322,7 @@ func (s *scheduleOperator) GetStatefulSets(item v1alpha1.AnalysisTask) []corev1.
 
 func (s *scheduleOperator) GetNamespaces(item v1alpha1.AnalysisTask) []corev1.ObjectReference {
 	labelSelect := (&client.ListOptions{}).ApplyOptions([]client.ListOption{
-		client.MatchingLabels{constants.AnalysisTaskAnnotationLabel: item.Name},
+		client.MatchingLabels{constants.AnalysisTaskLabelKey: item.Name},
 	})
 	ret, err := s.k8sClient.CoreV1().Namespaces().List(context.Background(), *labelSelect.AsListOptions())
 	if err != nil {

@@ -46,15 +46,18 @@ func addAllControllers(mgr manager.Manager, client k8s.Client, informerFactory i
 	analysisReconciler := &analysis.AnalysisTaskReconciler{
 		Client:                     mgr.GetClient(),
 		K8SClient:                  client,
+		Recorder:                   mgr.GetEventRecorderFor("analysis-task-controller"),
 		ScheduleClient:             scheduleClient,
-		DeploymentInformer:         informerFactory.KubernetesSharedInformerFactory().Apps().V1().Deployments(),
+		DeploymentsInformer:        informerFactory.KubernetesSharedInformerFactory().Apps().V1().Deployments(),
+		DaemonSetsInformer:         informerFactory.KubernetesSharedInformerFactory().Apps().V1().DaemonSets(),
+		StatefulSetsInformer:       informerFactory.KubernetesSharedInformerFactory().Apps().V1().StatefulSets(),
 		NamespaceInformer:          informerFactory.KubernetesSharedInformerFactory().Core().V1().Namespaces(),
 		AnalyticsInformer:          informerFactory.CraneInformer().Analysis().V1alpha1().Analytics(),
 		RecommendationInformer:     informerFactory.CraneInformer().Analysis().V1alpha1().Recommendations(),
 		DynamicInformer:            informerFactory.DynamicSharedInformerFactory(),
 		ClusterScheduleConfig:      &v1alpha1.ClusterScheduleConfig{},
 		NameSpaceAnalysisTaskCache: make(map[string]*v1alpha1.AnalysisTask),
-		NameSpaceReverseIndex:      map[string]map[string]*v1alpha1.AnalysisTask{},
+		AnalysisTaskReverseIndex:   make(map[string]*v1alpha1.AnalysisTask),
 	}
 	addControllerWithSetup(mgr, "analysis", analysisReconciler)
 
