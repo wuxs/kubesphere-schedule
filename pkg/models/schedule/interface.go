@@ -263,37 +263,32 @@ func (s *scheduleOperator) ListAnalysisTask(ctx context.Context, query *query.Qu
 	if err != nil {
 		return api.ListResult{}, err
 	}
-	var result = make([]runtime.Object, len(tasks.Items))
+	var result = make([]runtime.Object, 0, len(tasks.Items))
 	for _, item := range tasks.Items {
-		if item.Spec.Type == v1alpha1.WorkloadResourceType {
-			item.Status.TargetDeployments = s.GetDeployments(item)
-			item.Status.TargetDeployments = s.GetStatefulSets(item)
-		}
+		item.Status.TargetDeployments = s.GetDeployments(item)
+		item.Status.TargetStatefulSets = s.GetStatefulSets(item)
 		if item.Spec.Type == v1alpha1.NamespaceResourceType {
 			item.Status.TargetNamespaces = s.GetNamespaces(item)
 		}
+		result = append(result, &item)
 	}
 	return *resourcesV1alpha3.DefaultList(result, query, resourcesV1alpha3.DefaultCompare(), resourcesV1alpha3.DefaultFilter()), nil
 
 }
 
 func (s *scheduleOperator) GetDeployments(item v1alpha1.AnalysisTask) []corev1.ObjectReference {
-	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{
-		constants.AnalysisTaskWorkloadAnnotationLabel: item.Name,
-	}}
-	listOptions := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
-	}
-
-	ret, err := s.k8sClient.AppsV1().Deployments(item.Namespace).List(context.Background(), listOptions)
+	labelSelect := (&client.ListOptions{}).ApplyOptions([]client.ListOption{
+		client.MatchingLabels{constants.AnalysisTaskAnnotationLabel: item.Name},
+	})
+	ret, err := s.k8sClient.AppsV1().Deployments(item.Namespace).List(context.Background(), *labelSelect.AsListOptions())
 	if err != nil {
 		klog.Error(err)
 	} else {
-		var result = make([]corev1.ObjectReference, len(ret.Items))
+		var result = make([]corev1.ObjectReference, 0, len(ret.Items))
 		for _, workload := range ret.Items {
 			result = append(result, corev1.ObjectReference{
 				APIVersion: workload.APIVersion,
-				Kind:       workload.Kind,
+				Kind:       v1alpha1.DeploymentResource,
 				Name:       workload.Name,
 				Namespace:  workload.Namespace,
 			})
@@ -304,23 +299,18 @@ func (s *scheduleOperator) GetDeployments(item v1alpha1.AnalysisTask) []corev1.O
 }
 
 func (s *scheduleOperator) GetStatefulSets(item v1alpha1.AnalysisTask) []corev1.ObjectReference {
-
-	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{
-		constants.AnalysisTaskWorkloadAnnotationLabel: item.Name,
-	}}
-	listOptions := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
-	}
-
-	ret, err := s.k8sClient.AppsV1().StatefulSets(item.Namespace).List(context.Background(), listOptions)
+	labelSelect := (&client.ListOptions{}).ApplyOptions([]client.ListOption{
+		client.MatchingLabels{constants.AnalysisTaskAnnotationLabel: item.Name},
+	})
+	ret, err := s.k8sClient.AppsV1().StatefulSets(item.Namespace).List(context.Background(), *labelSelect.AsListOptions())
 	if err != nil {
 		klog.Error(err)
 	} else {
-		var result = make([]corev1.ObjectReference, len(ret.Items))
+		var result = make([]corev1.ObjectReference, 0, len(ret.Items))
 		for _, workload := range ret.Items {
 			result = append(result, corev1.ObjectReference{
 				APIVersion: workload.APIVersion,
-				Kind:       workload.Kind,
+				Kind:       v1alpha1.StatefulSetResource,
 				Name:       workload.Name,
 				Namespace:  workload.Namespace,
 			})
@@ -331,22 +321,18 @@ func (s *scheduleOperator) GetStatefulSets(item v1alpha1.AnalysisTask) []corev1.
 }
 
 func (s *scheduleOperator) GetNamespaces(item v1alpha1.AnalysisTask) []corev1.ObjectReference {
-	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{
-		constants.AnalysisTaskWorkloadAnnotationLabel: item.Name,
-	}}
-	listOptions := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
-	}
-
-	ret, err := s.k8sClient.CoreV1().Namespaces().List(context.Background(), listOptions)
+	labelSelect := (&client.ListOptions{}).ApplyOptions([]client.ListOption{
+		client.MatchingLabels{constants.AnalysisTaskAnnotationLabel: item.Name},
+	})
+	ret, err := s.k8sClient.CoreV1().Namespaces().List(context.Background(), *labelSelect.AsListOptions())
 	if err != nil {
 		klog.Error(err)
 	} else {
-		var result = make([]corev1.ObjectReference, len(ret.Items))
+		var result = make([]corev1.ObjectReference, 0, len(ret.Items))
 		for _, workload := range ret.Items {
 			result = append(result, corev1.ObjectReference{
 				APIVersion: workload.APIVersion,
-				Kind:       workload.Kind,
+				Kind:       v1alpha1.NamespaceResourceType,
 				Name:       workload.Name,
 				Namespace:  workload.Namespace,
 			})

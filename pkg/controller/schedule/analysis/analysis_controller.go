@@ -269,14 +269,44 @@ func (r *AnalysisTaskReconciler) doReconcileNamespaceAnalysis(ctx context.Contex
 			klog.Errorf("get deployment error: %s", err.Error())
 			return ctrl.Result{}, err
 		}
-		for _, deployment := range deployments.Items {
-			resource := convertResource(&deployment)
+		for _, workload := range deployments.Items {
+			resource := convertResource(&workload)
 			name := genAnalysisName(instance.Spec.Type, resource.Kind, resource.Name)
 			analytics := convertAnalytics(name, resource, instance.Spec.CompletionStrategy)
 			analytics = labelAnalyticsWithAnalysisName(analytics, instance)
 			err = r.ScheduleClient.CreateCraneAnalysis(ctx, namespace, name, analytics)
 			if err != nil {
 				klog.Errorf("creat analysis error: %s", err.Error())
+				return ctrl.Result{}, err
+			}
+			err = r.UpdateTargetMark(ctx, &workload, instance)
+			if err != nil {
+				klog.Errorf("update workload labels error: %s", err.Error())
+				return ctrl.Result{}, err
+			}
+
+			// add deployment index
+			r.UpdateIndexCache(instance.Namespace, resource.Kind, resource.Name, instance)
+		}
+
+		statefulSets, err := r.K8SClient.Kubernetes().AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			klog.Errorf("get deployment error: %s", err.Error())
+			return ctrl.Result{}, err
+		}
+		for _, workload := range statefulSets.Items {
+			resource := convertResource(&workload)
+			name := genAnalysisName(instance.Spec.Type, resource.Kind, resource.Name)
+			analytics := convertAnalytics(name, resource, instance.Spec.CompletionStrategy)
+			analytics = labelAnalyticsWithAnalysisName(analytics, instance)
+			err = r.ScheduleClient.CreateCraneAnalysis(ctx, namespace, name, analytics)
+			if err != nil {
+				klog.Errorf("creat analysis error: %s", err.Error())
+				return ctrl.Result{}, err
+			}
+			err = r.UpdateTargetMark(ctx, &workload, instance)
+			if err != nil {
+				klog.Errorf("update workload labels error: %s", err.Error())
 				return ctrl.Result{}, err
 			}
 
@@ -368,6 +398,7 @@ func (r *AnalysisTaskReconciler) UpdateIndexCache(namespace, workloadKind, workl
 	}
 	r.NameSpaceReverseIndex[namespace][key] = instance
 }
+
 func (r *AnalysisTaskReconciler) RemoveIndexCache(namespace, workloadKind, workloadName string) {
 	//r.IndexCache[key] = instance
 	key := genWorkloadIndexKey(namespace, workloadKind, workloadName)
@@ -458,7 +489,7 @@ func (r *AnalysisTaskReconciler) UpdateScheduleConfig(newObj interface{}) {
 		return
 	}
 	r.ClusterScheduleConfig = config
-	klog.Errorf("update cluster schedule config: %v", config)
+	klog.V(4).Infof("update cluster schedule config: %v", config)
 }
 
 // SetupWithManager sets up the controller with the Manager.

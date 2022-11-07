@@ -120,11 +120,14 @@ mock-gen:
 
 
 # Install CRDs into a cluster
-install: manifests
+install: manifests kustomize
 	kustomize build config/crd | kubectl apply -f -
 
+install-crd:
+	kubectl apply -f config/crd/bases
+
 # Uninstall CRDs from a cluster
-uninstall: manifests
+uninstall: manifests kustomize
 	kustomize build config/crd | kubectl delete -f -
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
@@ -142,12 +145,9 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 
 
 
-install-crd:
-	kubectl apply -f config/crd/bases
-
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v0.9.2
+KUSTOMIZE_VERSION ?= v4.5.5
 CONTROLLER_TOOLS_VERSION ?= v0.9.2
 
 # find or download controller-gen
