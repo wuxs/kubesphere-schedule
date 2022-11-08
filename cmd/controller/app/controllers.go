@@ -25,6 +25,7 @@ import (
 	"kubesphere.io/schedule/pkg/models/schedule"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"kubesphere.io/schedule/pkg/client/k8s"
 	"kubesphere.io/schedule/pkg/informers"
@@ -62,12 +63,12 @@ func addAllControllers(mgr manager.Manager, client k8s.Client, informerFactory i
 	addControllerWithSetup(mgr, "analysis", analysisReconciler)
 
 	//// Setup webhooks
-	//klog.Info("setting up webhook server")
-	//hookServer := mgr.GetWebhookServer()
-	//mgr.GetFieldIndexer()
+	klog.Info("setting up webhook server")
+	hookServer := mgr.GetWebhookServer()
+	mgr.GetFieldIndexer()
 	//
-	//klog.Info("registering webhooks to the webhook server")
-	//hookServer.Register("/mutate", &webhook.Admission{Handler: &analysis.Mutating{AnalysisTaskReconciler: analysisReconciler}})
+	klog.Info("registering webhooks to the webhook server")
+	hookServer.Register("/mutate", &webhook.Admission{Handler: &analysis.Mutating{AnalysisTaskReconciler: analysisReconciler}})
 	//hookServer.Register("/validate", &webhook.Admission{Handler: &analysis.Validating{AnalysisTaskReconciler: analysisReconciler}})
 
 	// log all controllers process result

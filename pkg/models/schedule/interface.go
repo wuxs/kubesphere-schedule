@@ -19,6 +19,8 @@ package schedule
 import (
 	"context"
 	"fmt"
+	"time"
+
 	cranealpha1 "github.com/gocrane/api/analysis/v1alpha1"
 	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
 	"github.com/mdaverde/jsonpath"
@@ -38,8 +40,8 @@ import (
 	"kubesphere.io/schedule/pkg/constants"
 	ks_informers "kubesphere.io/schedule/pkg/informers"
 	resourcesV1alpha3 "kubesphere.io/schedule/pkg/models/resources/v1alpha3"
+	jsonpathutil "kubesphere.io/schedule/pkg/utils/jsonpath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 const (
@@ -64,6 +66,7 @@ type Operator interface {
 	ModifyAnalysisTaskConfig(ctx context.Context, schedule *AnalysisTaskConfig) (*AnalysisTaskConfig, error)
 
 	//Scheduler
+	GetSchedulerConfig(ctx context.Context) (*SchedulerConfig, error)
 	ModifySchedulerConfig(ctx context.Context, config *SchedulerConfig) (*SchedulerConfig, error)
 
 	//Crane
@@ -93,6 +96,27 @@ type scheduleOperator struct {
 	k8sClient      kubernetes.Interface
 	resClient      ext.Interface
 	dynamicClient  dynamic.Interface
+}
+
+func (s *scheduleOperator) GetSchedulerConfig(ctx context.Context) (*SchedulerConfig, error) {
+	gvr := schema.GroupVersionResource{Group: "installer.kubesphere.io", Version: "v1alpha1", Resource: "clusterconfigurations"}
+
+	ksConfig, err := s.dynamicClient.Resource(gvr).Namespace(constants.KubeSphereNamespace).
+		Get(ctx, constants.KsClusterConfigurationInstallerName, metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to get cluster configurations for install ks in %s: %w", constants.KubeSphereNamespace, err)
+		}
+	}
+	ksConfigCopy := ksConfig.DeepCopy()
+	var schedulerConfig *SchedulerConfig
+	object := jsonpathutil.New(ksConfigCopy)
+	err = object.DataAs("spec.scheduler", &schedulerConfig)
+	if err != nil {
+		klog.Errorf("parse SchedulerConfig is error", object)
+		return nil, fmt.Errorf("failed to parse scheduler config: %w", err)
+	}
+	return schedulerConfig, nil
 }
 
 func (s *scheduleOperator) DescribeAnalysisTask(ctx context.Context, namespace, id string) (*v1alpha1.AnalysisTask, error) {
@@ -270,7 +294,7 @@ func (s *scheduleOperator) ListAnalysisTask(ctx context.Context, query *query.Qu
 		if item.Spec.Type == v1alpha1.NamespaceResourceType {
 			item.Status.TargetNamespaces = s.GetNamespaces(item)
 		}
-		result = append(result, &item)
+		result = append(result, item.DeepCopy())
 	}
 	return *resourcesV1alpha3.DefaultList(result, query, resourcesV1alpha3.DefaultCompare(), resourcesV1alpha3.DefaultFilter()), nil
 
