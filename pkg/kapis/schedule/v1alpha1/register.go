@@ -91,8 +91,8 @@ func AddToContainer(c *restful.Container, ksInfomrers informers.InformerFactory,
 		To(handler.ModifyAnalysisTaskConfig).
 		Doc("Modify analysis config").
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.ScheduleTag}).
-		Reads(schedule.SchedulerConfig{}).
-		Returns(http.StatusOK, api.StatusOK, schedule.SchedulerConfig{}))
+		Reads(schedule.AnalysisTaskConfig{}).
+		Returns(http.StatusOK, api.StatusOK, schedule.AnalysisTaskConfig{}))
 
 	//获取分析任务列表 GET /analysis @TODO
 	webservice.Route(webservice.GET("/analysis").

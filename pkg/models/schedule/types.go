@@ -14,6 +14,7 @@ limitations under the License.
 package schedule
 
 type AnalysisTaskConfig struct {
+	EnableNotify     *bool  `json:"enable_notify,omitempty"`
 	MemNotifyPresent *int64 `json:"mem_notify_present,omitempty"`
 	CPUNotifyPresent *int64 `json:"cpu_notify_present,omitempty"`
 }

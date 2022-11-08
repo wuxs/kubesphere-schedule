@@ -139,6 +139,15 @@ func (s *scheduleOperator) ModifyAnalysisTaskConfig(ctx context.Context, config 
 	}
 
 	ksConfigCopy := ksConfig.DeepCopy()
+	if config.EnableNotify != nil {
+		val, err := jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.analysis.enableNotify")
+		if err == nil {
+			jsonpath.Set(ksConfigCopy.Object, "spec.schedule.analysis.enableNotify", config.EnableNotify)
+			klog.V(4).Infof("update analysis notify status,old : %v, new %v", val, config.EnableNotify)
+		} else {
+			return nil, fmt.Errorf("failed to update analysis notify cpu threshold: %w", err)
+		}
+	}
 	if config.CPUNotifyPresent != nil {
 		val, err := jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.analysis.notifyThreshold.cpu")
 		if err == nil {
