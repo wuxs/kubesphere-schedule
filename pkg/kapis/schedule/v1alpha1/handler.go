@@ -15,6 +15,7 @@ package v1alpha1
 
 import (
 	"fmt"
+
 	restful "github.com/emicklei/go-restful"
 	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
 	"k8s.io/client-go/dynamic"
@@ -54,8 +55,10 @@ func NewScheduleClient(ksInformers informers.InformerFactory,
 }
 
 func (h *scheduleHandler) ListScheduler(request *restful.Request, response *restful.Response) {
-	//TODO implement me
-	panic("implement me")
+	ctx := request.Request.Context()
+	config, err := h.schedule.GetSchedulerConfig(ctx)
+	Result(config.SchedulerList, err).
+		Output(request, response, "get scheduler config")
 }
 
 func (h *scheduleHandler) ModifyScheduler(request *restful.Request, response *restful.Response) {
