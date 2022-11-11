@@ -29,7 +29,42 @@ rules:
   - analysis.crane.io
   resources:
   - analytics
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - analysis.crane.io
+  resources:
+  - analytics/status
+  verbs:
+  - get
+- apiGroups:
+  - analysis.crane.io
+  resources:
   - recommendations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - analysis.crane.io
+  resources:
+  - recommendations/status
+  verbs:
+  - get
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
   verbs:
   - create
   - delete
@@ -41,15 +76,43 @@ rules:
 - apiGroups:
   - apps
   resources:
-  - deployments
+  - daemonsets/status
   verbs:
   - get
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - apps
   resources:
   - deployments/status
+  verbs:
+  - get
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets/status
   verbs:
   - get
 - apiGroups:
