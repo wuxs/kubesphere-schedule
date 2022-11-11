@@ -933,7 +933,7 @@ func (r *AnalysisTaskReconciler) UpdateNamespacesWorkloads(ctx context.Context, 
 
 func (r *AnalysisTaskReconciler) UpdateAnalysisTaskStatus(ctx context.Context, instance *schedulev1alpha1.AnalysisTask, status schedulev1alpha1.Status) error {
 	instance.Status.Status = status
-	fmt.Println("update analysis task %s status to %s", instance.Name, status)
+	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "Update", "update analysis task %s status to %s", instance.Name, status)
 	err := r.Status().Update(ctx, instance)
 	return err
 }
