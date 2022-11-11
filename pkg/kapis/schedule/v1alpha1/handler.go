@@ -57,7 +57,7 @@ func NewScheduleClient(ksInformers informers.InformerFactory,
 func (h *scheduleHandler) ListScheduler(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
 	config, err := h.schedule.GetSchedulerConfig(ctx)
-	Result(config.SchedulerList, err).
+	Result(config, err).
 		Output(request, response, "get scheduler config")
 }
 

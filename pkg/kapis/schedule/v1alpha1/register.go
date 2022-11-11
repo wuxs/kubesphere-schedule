@@ -14,6 +14,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"net/http"
+
 	restful "github.com/emicklei/go-restful"
 	restfulspec "github.com/emicklei/go-restful-openapi"
 	"github.com/go-openapi/spec"
@@ -24,7 +26,6 @@ import (
 	"kubesphere.io/schedule/pkg/models"
 	"kubesphere.io/schedule/pkg/models/schedule"
 	"kubesphere.io/schedule/pkg/server/params"
-	"net/http"
 
 	"kubesphere.io/schedule/pkg/apiserver/runtime"
 	"kubesphere.io/schedule/pkg/client/clientset/versioned"
@@ -69,15 +70,15 @@ func AddToContainer(c *restful.Container, ksInfomrers informers.InformerFactory,
 		scheduleClient,
 	}
 
-	//获取调度器列表 GET /scheduler @TODO
-	webservice.Route(webservice.GET("/scheduler").
+	//获取调度器列表 GET /config @TODO
+	webservice.Route(webservice.GET("/config").
 		To(handler.ListScheduler).
-		Returns(http.StatusOK, api.StatusOK, schedule.SchedulerConfig{}).
+		Returns(http.StatusOK, api.StatusOK, v1alpha1.ClusterScheduleConfig{}).
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.ScheduleTag}).
 		Doc("List all applications within the specified cluster"))
 
-	//设置默认调度器 POST /scheduler (通过CM存放) @TODO
-	webservice.Route(webservice.PATCH("/scheduler").
+	//设置默认调度器 PATCH /config/scheduler (通过CM存放) @TODO
+	webservice.Route(webservice.PATCH("/config/scheduler").
 		Consumes(mimePatch...).
 		To(handler.ModifyScheduler).
 		Doc("Modify default scheduler").
@@ -85,8 +86,8 @@ func AddToContainer(c *restful.Container, ksInfomrers informers.InformerFactory,
 		Reads(schedule.SchedulerConfig{}).
 		Returns(http.StatusOK, api.StatusOK, schedule.SchedulerConfig{}))
 
-	//修改分析任务提醒设置 POST /analysis/notify (通过CM存放) @TODO
-	webservice.Route(webservice.PATCH("/analysis/config").
+	//修改分析任务提醒设置 PATCH /config/analysis (通过CM存放) @TODO
+	webservice.Route(webservice.PATCH("/config/analysis").
 		Consumes(mimePatch...).
 		To(handler.ModifyAnalysisTaskConfig).
 		Doc("Modify analysis config").

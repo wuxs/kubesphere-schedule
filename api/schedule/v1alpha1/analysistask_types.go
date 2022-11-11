@@ -44,12 +44,13 @@ const (
 type ClusterScheduleConfig struct {
 	Enable           bool     `json:"enable,omitempty"`
 	DefaultScheduler string   `json:"defaultScheduler,omitempty"`
-	Sschedulers      []string `json:"schedulers,omitempty"`
+	Schedulers       []string `json:"schedulers,omitempty"`
 	Analysis         struct {
 		NotifyThreshold struct {
 			Mem int64 `json:"mem,omitempty"`
 			CPU int64 `json:"cpu,omitempty"`
 		} `json:"notifyThreshold,omitempty"`
+		EnableNotify bool `json:"enableNotify,omitempty"`
 	} `json:"analysis,omitempty"`
 }
 
