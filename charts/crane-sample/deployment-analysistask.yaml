@@ -2,9 +2,9 @@
 apiVersion: schedule.kubesphere.io/v1alpha1
 kind: AnalysisTask
 metadata:
-  name: analysistask-abcd1234
+  name: analysistask-wl
 spec:
-  type: Deployment                        # This can only be "Deployment" or "Namespace".
+  type: Workload                        # This can only be "Deployment" or "Namespace".
   completionStrategy:
     completionStrategyType: Periodical  # This can only be "Once" or "Periodical".
     periodSeconds: 60                # analytics selected resources every 1 day

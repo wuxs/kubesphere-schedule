@@ -2,7 +2,7 @@
 apiVersion: schedule.kubesphere.io/v1alpha1
 kind: AnalysisTask
 metadata:
-  name: analysistask-abcd1234
+  name: analysistask-ns
 spec:
   type: Namespace                        # This can only be "Deployment" or "Namespace".
   completionStrategy:
