@@ -155,8 +155,10 @@ func (r *AnalysisTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	} else { // create or update
 		if !isConstructed {
 			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, constants.AnalysisTaskFinalizer)
-			instance.Status.Status = schedulev1alpha1.UpdatingStatus
 			if err := r.Update(context.Background(), instance); err != nil {
+				return reconcile.Result{}, err
+			}
+			if err = r.UpdateAnalysisTaskStatus(ctx, instance, v1alpha1.UpdatingStatus); err != nil {
 				return reconcile.Result{}, err
 			}
 			return reconcile.Result{}, nil
@@ -930,29 +932,7 @@ func (r *AnalysisTaskReconciler) UpdateNamespacesWorkloads(ctx context.Context, 
 }
 
 func (r *AnalysisTaskReconciler) UpdateAnalysisTaskStatus(ctx context.Context, instance *schedulev1alpha1.AnalysisTask, status schedulev1alpha1.Status) error {
-	task, err := r.K8SClient.Schedule().ScheduleV1alpha1().AnalysisTasks(instance.Namespace).Get(ctx, instance.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	taskCopy := task.DeepCopy()
-	taskCopy.Status.Status = status
-	patch := client.MergeFrom(task)
-	data, err := patch.Data(taskCopy)
-	if err != nil {
-		klog.Error("create patch failed", err)
-		return err
-	}
-
-	// data == "{}", need not to patch
-	if len(data) == 2 {
-		return nil
-	}
-
-	_, err = r.K8SClient.Schedule().ScheduleV1alpha1().AnalysisTasks(instance.Namespace).Patch(ctx, instance.Name, patch.Type(), data, metav1.PatchOptions{})
-	if err != nil {
-		klog.Error(err)
-		return err
-	}
-	return nil
+	instance.Status.Status = status
+	err := r.Status().Update(ctx, instance)
+	return err
 }

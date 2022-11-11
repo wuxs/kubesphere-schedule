@@ -204,11 +204,9 @@ spec:
                 format: date-time
                 type: string
               status:
-                description: 'Status is the status of AnalysisTask. Status is one
-                  of: "Pending", "Running", "Succeeded", "Failed", "Error", "Unknown"
-                  - "Pending": started but not running yet. - "Running": running.
-                  - "Succeeded": completed successfully. - "Failed": completed with
-                  errors. - "Error": error occurred.'
+                description: 'Status is the status of AnalysisTask. - "Updating":
+                  started but not running yet. - "Running": running. - "Completed":
+                  completed successfully. - "Error": completed with errors.'
                 type: string
               targetDeployments:
                 description: TargetDeployments is an array of current analytics conditions.
