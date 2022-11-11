@@ -5,10 +5,16 @@
 replicaCount: 1
 
 image:
-  repository: wuxs/sechdule-controller
-  pullPolicy: IfNotPresent # IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: dev
+    controller:
+        repository: wuxs/sechdule-controller
+        pullPolicy: IfNotPresent # IfNotPresent
+        # Overrides the image tag whose default is the chart appVersion.
+        tag: dev
+    api-server:
+        repository: wuxs/sechdule-apiserver
+        pullPolicy: IfNotPresent # IfNotPresent
+        # Overrides the image tag whose default is the chart appVersion.
+        tag: dev
 
 imagePullSecrets: []
 nameOverride: ""
