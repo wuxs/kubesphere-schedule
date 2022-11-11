@@ -34,8 +34,8 @@ spec:
           image: "{{ .Values.image.controller.repository }}:{{ .Values.image.controller.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.controller.pullPolicy }}
           ports:
-            - name: https
-              containerPort: 9443
+            - name: controller
+              containerPort: 8443
               protocol: TCP
           volumeMounts:
             - name: cert
@@ -46,11 +46,11 @@ spec:
         - name: {{ .Chart.Name }}-api-server
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.api-server.repository }}:{{ .Values.image.controller.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.apiserver.repository }}:{{ .Values.image.apiserver.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.controller.pullPolicy }}
           ports:
             - name: https
-              containerPort: 9443
+              containerPort: 9090
               protocol: TCP
           volumeMounts:
             - name: cert

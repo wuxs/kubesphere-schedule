@@ -6,15 +6,15 @@ replicaCount: 1
 
 image:
     controller:
-        repository: wuxs/sechdule-controller
+        repository: neolf/sechdule-controller
         pullPolicy: IfNotPresent # IfNotPresent
         # Overrides the image tag whose default is the chart appVersion.
-        tag: dev
-    api-server:
-        repository: wuxs/sechdule-apiserver
+        tag: dev--c02b6b5
+    apiserver:
+        repository: neolf/sechdule-apiserver
         pullPolicy: IfNotPresent # IfNotPresent
         # Overrides the image tag whose default is the chart appVersion.
-        tag: dev
+        tag: dev--c02b6b5
 
 imagePullSecrets: []
 nameOverride: ""
@@ -44,7 +44,10 @@ securityContext: {}
 
 service:
   type: ClusterIP
-  port: 443
+  port:
+    apiserver: 443
+    controller: 9090
+
 
 ingress:
   enabled: false
