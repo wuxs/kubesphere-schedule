@@ -94,12 +94,20 @@ type AnalysisTaskReconciler struct {
 //+kubebuilder:rbac:groups=schedule.kubesphere.io,resources=analysistasks/finalizers,verbs=update
 //+kubebuilder:rbac:groups=installer.kubesphere.io,resources=clusterconfigurations,verbs= get;list;watch;patch;update
 
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
+//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
+//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=daemonsets/status,verbs=get
+
+//+kubebuilder:rbac:groups=analysis.crane.io,resources=analytics,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=analysis.crane.io,resources=analytics/status,verbs=get
+//+kubebuilder:rbac:groups=analysis.crane.io,resources=recommendations,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=analysis.crane.io,resources=recommendations/status,verbs=get
+
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
-
-//+kubebuilder:rbac:groups=analysis.crane.io,resources=analytics;recommendations,verbs= get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
