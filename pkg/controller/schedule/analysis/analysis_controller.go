@@ -154,11 +154,11 @@ func (r *AnalysisTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	} else { // create or update
 		if !isConstructed {
-			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, constants.AnalysisTaskFinalizer)
-			if err := r.Update(context.Background(), instance); err != nil {
+			if err = r.UpdateAnalysisTaskStatus(ctx, instance, v1alpha1.UpdatingStatus); err != nil {
 				return reconcile.Result{}, err
 			}
-			if err = r.UpdateAnalysisTaskStatus(ctx, instance, v1alpha1.UpdatingStatus); err != nil {
+			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, constants.AnalysisTaskFinalizer)
+			if err := r.Update(context.Background(), instance); err != nil {
 				return reconcile.Result{}, err
 			}
 			return reconcile.Result{}, nil
@@ -202,6 +202,7 @@ func (r *AnalysisTaskReconciler) undoReconcile(ctx context.Context, instance *sc
 
 func (r *AnalysisTaskReconciler) doReconcileWorkloadAnalysis(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
+	hasError := false
 	namespace := instance.Namespace
 	workloads := strings.Split(r.GetNamespacesWorkloads(ctx, namespace), ",")
 	for _, resource := range instance.Spec.ResourceSelectors {
@@ -215,6 +216,7 @@ func (r *AnalysisTaskReconciler) doReconcileWorkloadAnalysis(ctx context.Context
 		if err != nil {
 			err := fmt.Errorf("create crane analysis failed, err: %w", err)
 			r.Recorder.Event(instance, corev1.EventTypeWarning, "CreateAnalysis", err.Error())
+			hasError = true
 			klog.Error(err)
 			continue
 		}
@@ -224,6 +226,10 @@ func (r *AnalysisTaskReconciler) doReconcileWorkloadAnalysis(ctx context.Context
 		}
 	}
 	r.UpdateIndexCache(instance)
+	if hasError {
+		err := r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.ErrorStatus)
+		return ctrl.Result{}, err
+	}
 
 	workloads = sliceutil.RemoveString(workloads, func(item string) bool { return item == "" })
 	if err := r.UpdateNamespacesWorkloads(ctx, namespace, strings.Join(workloads, ",")); err != nil {
@@ -235,7 +241,7 @@ func (r *AnalysisTaskReconciler) doReconcileWorkloadAnalysis(ctx context.Context
 	if instance.Spec.CompletionStrategy.CompletionStrategyType == v1alpha1.CompletionStrategyOnce {
 		err = r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.CompletedStatus)
 	}
-	if instance.Spec.Type == v1alpha1.NamespaceResourceType {
+	if instance.Spec.CompletionStrategy.CompletionStrategyType == v1alpha1.CompletionStrategyPeriodical {
 		err = r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.RunningStatus)
 	}
 	if err != nil {
@@ -304,7 +310,7 @@ func (r *AnalysisTaskReconciler) doReconcileNamespaceAnalysis(ctx context.Contex
 	if instance.Spec.CompletionStrategy.CompletionStrategyType == v1alpha1.CompletionStrategyOnce {
 		err = r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.CompletedStatus)
 	}
-	if instance.Spec.Type == v1alpha1.NamespaceResourceType {
+	if instance.Spec.CompletionStrategy.CompletionStrategyType == v1alpha1.CompletionStrategyPeriodical {
 		err = r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.RunningStatus)
 	}
 	if err != nil {
@@ -572,16 +578,10 @@ func (r *AnalysisTaskReconciler) AnalyticsEventHandler() cache.ResourceEventHand
 func (r *AnalysisTaskReconciler) RecommendationsEventHandler() cache.ResourceEventHandler {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			o := obj.(*cranev1alpha1.Recommendation)
-			klog.Infof("reciver Installer add event %v", o)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			o := newObj.(*cranev1alpha1.Recommendation)
-			klog.Infof("reciver Installer update event %v", o)
 		},
 		DeleteFunc: func(obj interface{}) {
-			o := obj.(*cranev1alpha1.Recommendation)
-			klog.Infof("reciver Installer delete event %v", o)
 		},
 	}
 }
@@ -933,6 +933,7 @@ func (r *AnalysisTaskReconciler) UpdateNamespacesWorkloads(ctx context.Context, 
 
 func (r *AnalysisTaskReconciler) UpdateAnalysisTaskStatus(ctx context.Context, instance *schedulev1alpha1.AnalysisTask, status schedulev1alpha1.Status) error {
 	instance.Status.Status = status
+	fmt.Println("update analysis task %s status to %s", instance.Name, status)
 	err := r.Status().Update(ctx, instance)
 	return err
 }

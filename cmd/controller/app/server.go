@@ -160,16 +160,6 @@ func run(s *options.KubeSphereControllerManagerOptions, ctx context.Context) err
 		mgrOptions.RenewDeadline = &s.LeaderElection.RenewDeadline
 	}
 
-	/*
-
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "fa68b2a3.kubesphere.io",
-	*/
-
 	klog.V(0).Info("setting up manager")
 	ctrl.SetLogger(klogr.New())
 	// Use 8443 instead of 443 cause we need root permission to bind port 443
