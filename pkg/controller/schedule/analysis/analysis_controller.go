@@ -162,16 +162,20 @@ func (r *AnalysisTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func (r *AnalysisTaskReconciler) doReconcile(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
+func (r *AnalysisTaskReconciler) doReconcile(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ret ctrl.Result, err error) {
 	switch instance.Spec.Type {
 	case v1alpha1.WorkloadResourceType:
-		return r.doReconcileWorkloadAnalysis(ctx, instance)
+		ret, err = r.doReconcileWorkloadAnalysis(ctx, instance)
 	case v1alpha1.NamespaceResourceType:
-		return r.doReconcileNamespaceAnalysis(ctx, instance)
+		ret, err = r.doReconcileNamespaceAnalysis(ctx, instance)
 	default:
 		klog.Infof("not support resource type %s, should be Namespace/Workload", instance.Spec.Type)
 		return ctrl.Result{}, nil
 	}
+	if err != nil {
+		r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.ErrorStatus)
+	}
+	return
 }
 
 func (r *AnalysisTaskReconciler) undoReconcile(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
@@ -216,6 +220,18 @@ func (r *AnalysisTaskReconciler) doReconcileWorkloadAnalysis(ctx context.Context
 		klog.Errorf("get deployment error: %s", err.Error())
 		return ctrl.Result{}, err
 	}
+
+	var err error
+	if instance.Spec.CompletionStrategy.CompletionStrategyType == v1alpha1.CompletionStrategyOnce {
+		err = r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.CompletedStatus)
+	}
+	if instance.Spec.Type == v1alpha1.NamespaceResourceType {
+		err = r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.RunningStatus)
+	}
+	if err != nil {
+		klog.Errorf("update analysis task status error: %s", err.Error())
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -272,6 +288,17 @@ func (r *AnalysisTaskReconciler) doReconcileNamespaceAnalysis(ctx context.Contex
 			klog.Errorf("get deployment error: %s", err.Error())
 			return ctrl.Result{}, err
 		}
+	}
+
+	var err error
+	if instance.Spec.CompletionStrategy.CompletionStrategyType == v1alpha1.CompletionStrategyOnce {
+		err = r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.CompletedStatus)
+	}
+	if instance.Spec.Type == v1alpha1.NamespaceResourceType {
+		err = r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.RunningStatus)
+	}
+	if err != nil {
+		klog.Errorf("update analysis task status error: %s", err.Error())
 	}
 	return ctrl.Result{}, nil
 }
@@ -887,6 +914,34 @@ func (r *AnalysisTaskReconciler) UpdateNamespacesWorkloads(ctx context.Context, 
 	}
 
 	_, err = r.K8SClient.Kubernetes().CoreV1().Namespaces().Patch(ctx, namespace, patch.Type(), data, metav1.PatchOptions{})
+	if err != nil {
+		klog.Error(err)
+		return err
+	}
+	return nil
+}
+
+func (r *AnalysisTaskReconciler) UpdateAnalysisTaskStatus(ctx context.Context, instance *schedulev1alpha1.AnalysisTask, status schedulev1alpha1.Status) error {
+	task, err := r.K8SClient.Schedule().ScheduleV1alpha1().AnalysisTasks(instance.Namespace).Get(ctx, instance.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	taskCopy := task.DeepCopy()
+	taskCopy.Status.Status = status
+	patch := client.MergeFrom(task)
+	data, err := patch.Data(taskCopy)
+	if err != nil {
+		klog.Error("create patch failed", err)
+		return err
+	}
+
+	// data == "{}", need not to patch
+	if len(data) == 2 {
+		return nil
+	}
+
+	_, err = r.K8SClient.Schedule().ScheduleV1alpha1().AnalysisTasks(instance.Namespace).Patch(ctx, instance.Name, patch.Type(), data, metav1.PatchOptions{})
 	if err != nil {
 		klog.Error(err)
 		return err

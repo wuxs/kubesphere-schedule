@@ -102,6 +102,7 @@ func (h *scheduleHandler) CreateWorkloadAnalysis(request *restful.Request, respo
 		return
 	}
 
+	analysisTask.Status.Status = v1alpha1.UpdatingStatus
 	Result(h.schedule.CreateAnalysisTask(ctx, namespaceID, analysisTask)).
 		Output(request, response, "create deployment analysis task %s", analysisTask.Name)
 }
@@ -121,7 +122,7 @@ func (h *scheduleHandler) CreateNamespaceAnalysis(request *restful.Request, resp
 		api.HandleBadRequest(response, nil, ErrScheduleTypeNil)
 		return
 	}
-
+	analysisTask.Status.Status = v1alpha1.UpdatingStatus
 	Result(h.schedule.CreateAnalysisTask(ctx, constants.KubesphereScheduleNamespace, analysisTask)).
 		Output(request, response, "create deployment analysis task %s", analysisTask.Name)
 }

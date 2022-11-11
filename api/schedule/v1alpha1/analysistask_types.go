@@ -25,6 +25,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type Status string
+
 const (
 	NamespaceResourceType string = "Namespace"
 	WorkloadResourceType  string = "Workload"
@@ -34,11 +36,15 @@ const (
 	DaemonSetResource   string = "DaemonSet"
 	ReplicaSetResource  string = "ReplicaSet"
 
-	PendingStatus string = "pending"
-	RunningStatus string = "running"
-	SuccessStatus string = "success"
-	FailedStatus  string = "failed"
-	ErrorStatus   string = "Error"
+	UpdatingStatus  Status = "Updating"
+	RunningStatus   Status = "Running"
+	CompletedStatus Status = "Completed"
+	ErrorStatus     Status = "Error"
+)
+
+var (
+	CompletionStrategyPeriodical = cranev1.CompletionStrategyPeriodical
+	CompletionStrategyOnce       = cranev1.CompletionStrategyOnce
 )
 
 type ClusterScheduleConfig struct {
@@ -89,14 +95,12 @@ type AnalysisTaskSpec struct {
 // AnalysisStatus defines the observed state of Analysis
 type AnalysisTaskStatus struct {
 	// Status is the status of AnalysisTask.
-	// Status is one of: "Pending", "Running", "Succeeded", "Failed", "Error", "Unknown"
-	// - "Pending": started but not running yet.
+	// - "Updating": started but not running yet.
 	// - "Running": running.
-	// - "Succeeded": completed successfully.
-	// - "Failed": completed with errors.
-	// - "Error": error occurred.
+	// - "Completed": completed successfully.
+	// - "Error": completed with errors.
 	// +optional
-	Status string `json:"status,omitempty"`
+	Status Status `json:"status,omitempty"`
 
 	// LastUpdateTime is the last time the status updated.
 	// +optional
