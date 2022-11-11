@@ -147,7 +147,7 @@ func (r *AnalysisTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	} else { // create or update
 		if !isConstructed {
 			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, constants.AnalysisTaskFinalizer)
-			instance.Status.Status = schedulev1alpha1.PendingStatus
+			instance.Status.Status = schedulev1alpha1.UpdatingStatus
 			if err := r.Update(context.Background(), instance); err != nil {
 				return reconcile.Result{}, err
 			}
