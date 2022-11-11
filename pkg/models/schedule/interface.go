@@ -34,6 +34,7 @@ import (
 	"k8s.io/klog"
 	"kubesphere.io/schedule/api"
 	"kubesphere.io/schedule/api/schedule/v1alpha1"
+	schedulev1alpha1 "kubesphere.io/schedule/api/schedule/v1alpha1"
 	"kubesphere.io/schedule/pkg/apiserver/query"
 	"kubesphere.io/schedule/pkg/client/clientset/versioned"
 	"kubesphere.io/schedule/pkg/client/informers/externalversions"
@@ -66,7 +67,7 @@ type Operator interface {
 	ModifyAnalysisTaskConfig(ctx context.Context, schedule *AnalysisTaskConfig) (*AnalysisTaskConfig, error)
 
 	//Scheduler
-	GetSchedulerConfig(ctx context.Context) (*SchedulerConfig, error)
+	GetSchedulerConfig(ctx context.Context) (*schedulev1alpha1.ClusterScheduleConfig, error)
 	ModifySchedulerConfig(ctx context.Context, config *SchedulerConfig) (*SchedulerConfig, error)
 
 	//Crane
@@ -98,20 +99,23 @@ type scheduleOperator struct {
 	dynamicClient  dynamic.Interface
 }
 
-func (s *scheduleOperator) GetSchedulerConfig(ctx context.Context) (*SchedulerConfig, error) {
+func (s *scheduleOperator) GetSchedulerConfig(ctx context.Context) (*schedulev1alpha1.ClusterScheduleConfig, error) {
 	gvr := schema.GroupVersionResource{Group: "installer.kubesphere.io", Version: "v1alpha1", Resource: "clusterconfigurations"}
 
 	ksConfig, err := s.dynamicClient.Resource(gvr).Namespace(constants.KubeSphereNamespace).
 		Get(ctx, constants.KsClusterConfigurationInstallerName, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
+			klog.Errorf("get ks config error: %w", err)
 			return nil, fmt.Errorf("Failed to get cluster configurations for install ks in %s: %w", constants.KubeSphereNamespace, err)
+		} else {
+			klog.Warningf("ks config not found: %w", err)
 		}
 	}
 	ksConfigCopy := ksConfig.DeepCopy()
-	var schedulerConfig *SchedulerConfig
+	var schedulerConfig = &schedulev1alpha1.ClusterScheduleConfig{}
 	object := jsonpathutil.New(ksConfigCopy)
-	err = object.DataAs("spec.scheduler", &schedulerConfig)
+	err = object.DataAs("spec.scheduler", schedulerConfig)
 	if err != nil {
 		klog.Errorf("parse SchedulerConfig is error", object)
 		return nil, fmt.Errorf("failed to parse scheduler config: %w", err)
@@ -142,16 +146,16 @@ func (s *scheduleOperator) ModifyAnalysisTaskConfig(ctx context.Context, config 
 	if config.EnableNotify != nil {
 		val, err := jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.analysis.enableNotify")
 		if err == nil {
-			jsonpath.Set(ksConfigCopy.Object, "spec.schedule.analysis.enableNotify", config.EnableNotify)
+			_ = jsonpath.Set(ksConfigCopy.Object, "spec.scheduler.analysis.enableNotify", config.EnableNotify)
 			klog.V(4).Infof("update analysis notify status,old : %v, new %v", val, config.EnableNotify)
 		} else {
-			return nil, fmt.Errorf("failed to update analysis notify cpu threshold: %w", err)
+			return nil, fmt.Errorf("failed to update analysis notify status: %w", err)
 		}
 	}
 	if config.CPUNotifyPresent != nil {
 		val, err := jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.analysis.notifyThreshold.cpu")
 		if err == nil {
-			jsonpath.Set(ksConfigCopy.Object, "spec.schedule.analysis.notifyThreshold.cpu", config.CPUNotifyPresent)
+			_ = jsonpath.Set(ksConfigCopy.Object, "spec.scheduler.analysis.notifyThreshold.cpu", config.CPUNotifyPresent)
 			klog.V(4).Infof("update analysis notify cpu threshold,old : %v, new %v", val, config.CPUNotifyPresent)
 		} else {
 			return nil, fmt.Errorf("failed to update analysis notify cpu threshold: %w", err)
@@ -160,7 +164,7 @@ func (s *scheduleOperator) ModifyAnalysisTaskConfig(ctx context.Context, config 
 	if config.MemNotifyPresent != nil {
 		val, err := jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.analysis.notifyThreshold.mem")
 		if err == nil {
-			jsonpath.Set(ksConfigCopy.Object, "spec.schedule.analysis.notifyThreshold.mem", config.MemNotifyPresent)
+			_ = jsonpath.Set(ksConfigCopy.Object, "spec.scheduler.analysis.notifyThreshold.mem", config.MemNotifyPresent)
 			klog.V(4).Infof("update analysis notify mem threshold,old : %v, new %v", val, config.MemNotifyPresent)
 		} else {
 			return nil, fmt.Errorf("failed to update analysis notify mem threshold: %w", err)
@@ -190,7 +194,7 @@ func (s *scheduleOperator) ModifyAnalysisTaskConfig(ctx context.Context, config 
 }
 
 func (s *scheduleOperator) ModifySchedulerConfig(ctx context.Context, config *SchedulerConfig) (*SchedulerConfig, error) {
-	if config.Scheduler != nil {
+	if config.Scheduler == nil {
 		err := fmt.Errorf("Failed to update default scheduler, config.Scheduler is nil")
 		return nil, err
 	}
