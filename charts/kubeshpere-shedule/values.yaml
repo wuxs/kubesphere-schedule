@@ -45,8 +45,8 @@ securityContext: {}
 service:
   type: ClusterIP
   port:
-    apiserver: 443
-    controller: 9090
+    apiserver: 9090
+    controller: 443
 
 
 ingress:

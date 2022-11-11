@@ -34,7 +34,7 @@ spec:
           image: "{{ .Values.image.controller.repository }}:{{ .Values.image.controller.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.controller.pullPolicy }}
           ports:
-            - name: controller
+            - name: https
               containerPort: 8443
               protocol: TCP
           volumeMounts:
@@ -49,7 +49,7 @@ spec:
           image: "{{ .Values.image.apiserver.repository }}:{{ .Values.image.apiserver.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.controller.pullPolicy }}
           ports:
-            - name: https
+            - name: http
               containerPort: 9090
               protocol: TCP
           volumeMounts:

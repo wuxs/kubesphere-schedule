@@ -1,19 +1,19 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kubesphere-schedule.fullname" . }}
+  name: {{ include "kubesphere-schedule.name" . }}
   labels:
     {{- include "kubesphere-schedule.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port.apiserver }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: {{ .Values.service.port.controller }}
       targetPort: https
       protocol: TCP
       name: https
-    - port: {{ .Values.service.port.controller }}
-      targetPort: controller
-      protocol: TCP
-      name: controller
   selector:
     {{- include "kubesphere-schedule.selectorLabels" . | nindent 4 }}
