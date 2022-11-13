@@ -43,6 +43,7 @@ type KubeSphereControllerManagerOptions struct {
 	ScheduleOptions   *schedule.Options
 
 	LeaderElect             bool
+	DisableWebhookServer    bool
 	LeaderElection          *leaderelection.LeaderElectionConfig
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	WebhookCertDir          string
@@ -81,6 +82,7 @@ func NewKubeSphereControllerManagerOptions() *KubeSphereControllerManagerOptions
 		},
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
 		LeaderElect:             false,
+		DisableWebhookServer:    false,
 		WebhookCertDir:          "",
 		ApplicationSelector:     "",
 		ControllerGates:         []string{"*"},
@@ -98,6 +100,10 @@ func (s *KubeSphereControllerManagerOptions) Flags(allControllerNameSelectors []
 	s.bindLeaderElectionFlags(s.LeaderElection, fs)
 
 	fs.BoolVar(&s.LeaderElect, "leader-elect", s.LeaderElect, ""+
+		"Whether to enable leader election. This field should be enabled when controller manager"+
+		"deployed with multiple replicas.")
+
+	fs.BoolVar(&s.DisableWebhookServer, "disable-webhook-server", s.LeaderElect, ""+
 		"Whether to enable leader election. This field should be enabled when controller manager"+
 		"deployed with multiple replicas.")
 

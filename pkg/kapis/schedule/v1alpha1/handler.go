@@ -15,6 +15,8 @@ package v1alpha1
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/errors"
+	servererr "kubesphere.io/schedule/pkg/server/errors"
 
 	restful "github.com/emicklei/go-restful"
 	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
@@ -28,7 +30,6 @@ import (
 	scheduleoptions "kubesphere.io/schedule/pkg/client/schedule"
 	"kubesphere.io/schedule/pkg/constants"
 	"kubesphere.io/schedule/pkg/informers"
-	"kubesphere.io/schedule/pkg/kapis"
 	"kubesphere.io/schedule/pkg/models/schedule"
 )
 
@@ -56,9 +57,8 @@ func NewScheduleClient(ksInformers informers.InformerFactory,
 
 func (h *scheduleHandler) ListScheduler(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
-	config, err := h.schedule.GetSchedulerConfig(ctx)
-	Result(config, err).
-		Output(request, response, "get scheduler config")
+	objs, err := h.schedule.GetSchedulerConfig(ctx)
+	handleResponse(request, response, objs, err)
 }
 
 func (h *scheduleHandler) ModifyScheduler(request *restful.Request, response *restful.Response) {
@@ -71,23 +71,21 @@ func (h *scheduleHandler) ModifyScheduler(request *restful.Request, response *re
 		return
 	}
 
-	Result(h.schedule.ModifySchedulerConfig(ctx, schedulerConfig)).
-		Output(request, response, "modify scheduler config: ", schedulerConfig)
+	objs, err := h.schedule.ModifySchedulerConfig(ctx, schedulerConfig)
+	handleResponse(request, response, objs, err)
 }
 
 func (h *scheduleHandler) ListAnalysisTask(request *restful.Request, response *restful.Response) {
 	//analysis := request.PathParameter("analysis")
 	ctx := request.Request.Context()
 	query := query.ParseQueryParameter(request)
-	if h.Ready(request, response) {
-		objs, err := h.schedule.ListAnalysisTask(ctx, query)
-		kapis.ErrorHandle(request, response, objs, err)
-	}
+	objs, err := h.schedule.ListAnalysisTask(ctx, query)
+	handleResponse(request, response, objs, err)
 }
 
 func (h *scheduleHandler) CreateWorkloadAnalysis(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
-	namespaceID := request.PathParameter("namespace")
+	namespace := request.PathParameter("namespace")
 	var analysisTask *v1alpha1.AnalysisTask
 	err := request.ReadEntity(&analysisTask)
 	if err != nil {
@@ -102,9 +100,8 @@ func (h *scheduleHandler) CreateWorkloadAnalysis(request *restful.Request, respo
 		return
 	}
 
-	analysisTask.Status.Status = v1alpha1.UpdatingStatus
-	Result(h.schedule.CreateAnalysisTask(ctx, namespaceID, analysisTask)).
-		Output(request, response, "create deployment analysis task %s", analysisTask.Name)
+	ret, err := h.schedule.CreateAnalysisTask(ctx, namespace, analysisTask)
+	handleResponse(request, response, ret, err)
 }
 
 func (h *scheduleHandler) CreateNamespaceAnalysis(request *restful.Request, response *restful.Response) {
@@ -122,15 +119,15 @@ func (h *scheduleHandler) CreateNamespaceAnalysis(request *restful.Request, resp
 		api.HandleBadRequest(response, nil, ErrScheduleTypeNil)
 		return
 	}
-	analysisTask.Status.Status = v1alpha1.UpdatingStatus
-	Result(h.schedule.CreateAnalysisTask(ctx, constants.KubesphereScheduleNamespace, analysisTask)).
-		Output(request, response, "create deployment analysis task %s", analysisTask.Name)
+
+	ret, err := h.schedule.CreateAnalysisTask(ctx, constants.KubesphereScheduleNamespace, analysisTask)
+	handleResponse(request, response, ret, err)
 }
 
 func (h *scheduleHandler) ModifyAnalysisTask(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
-	analysisID := request.PathParameter("analysis")
-	namespaceID := request.PathParameter("namespace")
+	analysis := request.PathParameter("analysis")
+	namespace := request.PathParameter("namespace")
 	var analysisTask *v1alpha1.AnalysisTask
 	err := request.ReadEntity(&analysisTask)
 	if err != nil {
@@ -139,26 +136,26 @@ func (h *scheduleHandler) ModifyAnalysisTask(request *restful.Request, response 
 		return
 	}
 
-	Result(h.schedule.ModifyAnalysisTask(ctx, namespaceID, analysisID, analysisTask)).
-		Output(request, response, "modify analysis task: ", analysisID)
+	err = h.schedule.ModifyAnalysisTask(ctx, namespace, analysis, analysisTask)
+	handleResponse(request, response, servererr.None, err)
 }
 
 func (h *scheduleHandler) DescribeAnalysisTask(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
-	analysisID := request.PathParameter("analysis")
-	namespaceID := request.PathParameter("namespace")
+	analysis := request.PathParameter("analysis")
+	namespace := request.PathParameter("namespace")
 
-	Result(h.schedule.DescribeAnalysisTask(ctx, namespaceID, analysisID)).
-		Output(request, response, "describe analysis task: ", analysisID)
+	ret, err := h.schedule.DescribeAnalysisTask(ctx, namespace, analysis)
+	handleResponse(request, response, ret, err)
 }
 
 func (h *scheduleHandler) DeleteAnalysisTask(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
-	analysisID := request.PathParameter("analysis")
+	analysis := request.PathParameter("analysis")
 	namespace := request.PathParameter("namespace")
 
-	Result(h.schedule.DeleteAnalysisTask(ctx, namespace, analysisID)).
-		Output(request, response, "delete analysis task: ", analysisID)
+	err := h.schedule.DeleteAnalysisTask(ctx, namespace, analysis)
+	handleResponse(request, response, servererr.None, err)
 }
 
 func (h *scheduleHandler) ModifyAnalysisTaskConfig(request *restful.Request, response *restful.Response) {
@@ -171,14 +168,23 @@ func (h *scheduleHandler) ModifyAnalysisTaskConfig(request *restful.Request, res
 		return
 	}
 
-	Result(h.schedule.ModifyAnalysisTaskConfig(ctx, analysisConfig)).
-		Output(request, response, "modify analysis task config: ", analysisConfig)
+	ret, err := h.schedule.ModifyAnalysisTaskConfig(ctx, analysisConfig)
+	handleResponse(request, response, ret, err)
 }
 
-func (h *scheduleHandler) Ready(request *restful.Request, response *restful.Response) bool {
-	if h.schedule != nil {
-		return true
+func handleResponse(req *restful.Request, resp *restful.Response, obj interface{}, err error) {
+	if err != nil {
+		klog.Error(err)
+		if errors.IsNotFound(err) {
+			api.HandleNotFound(resp, req, err)
+			return
+		} else if errors.IsConflict(err) {
+			api.HandleConflict(resp, req, err)
+			return
+		}
+		api.HandleBadRequest(resp, req, err)
+		return
 	}
-	kapis.HandleBadRequest(response, request, ErrScheduleClientNil)
-	return false
+
+	_ = resp.WriteEntity(obj)
 }

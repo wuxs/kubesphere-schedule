@@ -18,18 +18,16 @@ package schedule
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	cranealpha1 "github.com/gocrane/api/analysis/v1alpha1"
 	ext "github.com/gocrane/api/pkg/generated/clientset/versioned"
-	"github.com/mdaverde/jsonpath"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	"kubesphere.io/schedule/api"
@@ -41,11 +39,11 @@ import (
 	"kubesphere.io/schedule/pkg/constants"
 	ks_informers "kubesphere.io/schedule/pkg/informers"
 	resourcesV1alpha3 "kubesphere.io/schedule/pkg/models/resources/v1alpha3"
-	jsonpathutil "kubesphere.io/schedule/pkg/utils/jsonpath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
+	configName           = "schedule-config"
 	configMapPrefix      = "kubeconfig-"
 	kubeconfigNameFormat = configMapPrefix + "%s"
 	defaultClusterName   = "local"
@@ -67,7 +65,7 @@ type Operator interface {
 	ModifyAnalysisTaskConfig(ctx context.Context, schedule *AnalysisTaskConfig) (*AnalysisTaskConfig, error)
 
 	//Scheduler
-	GetSchedulerConfig(ctx context.Context) (*schedulev1alpha1.ClusterScheduleConfig, error)
+	GetScheduleConfig(ctx context.Context) (*schedulev1alpha1.ClusterScheduleConfig, error)
 	ModifySchedulerConfig(ctx context.Context, config *SchedulerConfig) (*SchedulerConfig, error)
 
 	//Crane
@@ -79,7 +77,7 @@ func NewScheduleOperator(ksInformers ks_informers.InformerFactory,
 	k8sClient kubernetes.Interface,
 	scheduleClient versioned.Interface,
 	resClient ext.Interface,
-	dynamicClient dynamic.Interface, stopCh <-chan struct{}) Operator {
+	stopCh <-chan struct{}) Operator {
 	klog.Infof("start helm repo informer")
 
 	return &scheduleOperator{
@@ -87,7 +85,6 @@ func NewScheduleOperator(ksInformers ks_informers.InformerFactory,
 		k8sClient:      k8sClient,
 		scheduleClient: scheduleClient,
 		resClient:      resClient,
-		dynamicClient:  dynamicClient,
 	}
 }
 
@@ -96,31 +93,6 @@ type scheduleOperator struct {
 	scheduleClient versioned.Interface
 	k8sClient      kubernetes.Interface
 	resClient      ext.Interface
-	dynamicClient  dynamic.Interface
-}
-
-func (s *scheduleOperator) GetSchedulerConfig(ctx context.Context) (*schedulev1alpha1.ClusterScheduleConfig, error) {
-	gvr := schema.GroupVersionResource{Group: "installer.kubesphere.io", Version: "v1alpha1", Resource: "clusterconfigurations"}
-
-	ksConfig, err := s.dynamicClient.Resource(gvr).Namespace(constants.KubeSphereNamespace).
-		Get(ctx, constants.KsClusterConfigurationInstallerName, metav1.GetOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			klog.Errorf("get ks config error: %w", err)
-			return nil, fmt.Errorf("Failed to get cluster configurations for install ks in %s: %w", constants.KubeSphereNamespace, err)
-		} else {
-			klog.Warningf("ks config not found: %w", err)
-		}
-	}
-	ksConfigCopy := ksConfig.DeepCopy()
-	var schedulerConfig = &schedulev1alpha1.ClusterScheduleConfig{}
-	object := jsonpathutil.New(ksConfigCopy)
-	err = object.DataAs("spec.scheduler", schedulerConfig)
-	if err != nil {
-		klog.Errorf("parse SchedulerConfig is error", object)
-		return nil, fmt.Errorf("failed to parse scheduler config: %w", err)
-	}
-	return schedulerConfig, nil
 }
 
 func (s *scheduleOperator) DescribeAnalysisTask(ctx context.Context, namespace, id string) (*v1alpha1.AnalysisTask, error) {
@@ -132,62 +104,21 @@ func (s *scheduleOperator) DeleteAnalysisTask(ctx context.Context, namespace, id
 }
 
 func (s *scheduleOperator) ModifyAnalysisTaskConfig(ctx context.Context, config *AnalysisTaskConfig) (*AnalysisTaskConfig, error) {
-	gvr := schema.GroupVersionResource{Group: "installer.kubesphere.io", Version: "v1alpha1", Resource: "clusterconfigurations"}
-
-	ksConfig, err := s.dynamicClient.Resource(gvr).Namespace(constants.KubeSphereNamespace).
-		Get(ctx, constants.KsClusterConfigurationInstallerName, metav1.GetOptions{})
+	cfg, err := s.GetScheduleConfig(ctx)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Failed to get cluster configurations for install ks in %s: %w", constants.KubeSphereNamespace, err)
 		}
 	}
 
-	ksConfigCopy := ksConfig.DeepCopy()
 	if config.EnableNotify != nil {
-		val, err := jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.analysis.enableNotify")
-		if err == nil {
-			_ = jsonpath.Set(ksConfigCopy.Object, "spec.scheduler.analysis.enableNotify", config.EnableNotify)
-			klog.V(4).Infof("update analysis notify status,old : %v, new %v", val, config.EnableNotify)
-		} else {
-			return nil, fmt.Errorf("failed to update analysis notify status: %w", err)
-		}
+		cfg.Analysis.EnableNotify = *config.EnableNotify
 	}
 	if config.CPUNotifyPresent != nil {
-		val, err := jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.analysis.notifyThreshold.cpu")
-		if err == nil {
-			_ = jsonpath.Set(ksConfigCopy.Object, "spec.scheduler.analysis.notifyThreshold.cpu", config.CPUNotifyPresent)
-			klog.V(4).Infof("update analysis notify cpu threshold,old : %v, new %v", val, config.CPUNotifyPresent)
-		} else {
-			return nil, fmt.Errorf("failed to update analysis notify cpu threshold: %w", err)
-		}
+		cfg.Analysis.NotifyThreshold.CPU = *config.CPUNotifyPresent
 	}
 	if config.MemNotifyPresent != nil {
-		val, err := jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.analysis.notifyThreshold.mem")
-		if err == nil {
-			_ = jsonpath.Set(ksConfigCopy.Object, "spec.scheduler.analysis.notifyThreshold.mem", config.MemNotifyPresent)
-			klog.V(4).Infof("update analysis notify mem threshold,old : %v, new %v", val, config.MemNotifyPresent)
-		} else {
-			return nil, fmt.Errorf("failed to update analysis notify mem threshold: %w", err)
-		}
-	}
-
-	patch := client.MergeFrom(ksConfig)
-	data, err := patch.Data(ksConfigCopy)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create patch: %w", err)
-	}
-
-	// data == "{}", need not to patch
-	if len(data) == 2 {
-		return config, nil
-	}
-
-	_, err = s.dynamicClient.Resource(gvr).Namespace(constants.KubeSphereNamespace).
-		Patch(ctx, constants.KsClusterConfigurationInstallerName, patch.Type(), data, metav1.PatchOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("Failed to update cluster configurations for install ks in %s: %w", constants.KubeSphereNamespace, err)
-		}
+		cfg.Analysis.NotifyThreshold.Mem = *config.MemNotifyPresent
 	}
 
 	return config, nil
@@ -199,41 +130,17 @@ func (s *scheduleOperator) ModifySchedulerConfig(ctx context.Context, config *Sc
 		return nil, err
 	}
 
-	gvr := schema.GroupVersionResource{Group: "installer.kubesphere.io", Version: "v1alpha1", Resource: "clusterconfigurations"}
-	ksConfig, err := s.dynamicClient.Resource(gvr).Namespace(constants.KubeSphereNamespace).
-		Get(ctx, constants.KsClusterConfigurationInstallerName, metav1.GetOptions{})
+	cfg, err := s.GetScheduleConfig(ctx)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Failed to get cluster configurations for install ks in %s: %w", constants.KubeSphereNamespace, err)
 		}
 	}
 
-	ksConfigCopy := ksConfig.DeepCopy()
-	val, err := jsonpath.Get(ksConfigCopy.Object, "spec.scheduler.defaultScheduler")
-	if err == nil {
-		jsonpath.Set(ksConfigCopy.Object, "spec.scheduler.defaultScheduler", config.Scheduler)
-		klog.V(4).Infof("update default scheduler,old : %v, new %v", val, config.Scheduler)
-	} else {
-		return nil, fmt.Errorf("failed to update default scheduler: %w", err)
-	}
-
-	patch := client.MergeFrom(ksConfig)
-	data, err := patch.Data(ksConfigCopy)
+	cfg.DefaultScheduler = *config.Scheduler
+	err = s.SaveScheduleConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create patch: %w", err)
-	}
-
-	// data == "{}", need not to patch
-	if len(data) == 2 {
-		return config, nil
-	}
-
-	_, err = s.dynamicClient.Resource(gvr).Namespace(constants.KubeSphereNamespace).
-		Patch(ctx, constants.KsClusterConfigurationInstallerName, patch.Type(), data, metav1.PatchOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("Failed to update cluster configurations for install ks in %s: %w", constants.KubeSphereNamespace, err)
-		}
 	}
 
 	return config, nil
@@ -377,4 +284,43 @@ func (s *scheduleOperator) GetNamespaces(item v1alpha1.AnalysisTask) []corev1.Ob
 		return result
 	}
 	return []corev1.ObjectReference{}
+}
+
+// UpdateKubeconfig Update client key and client certificate after CertificateSigningRequest has been approved
+func (o *scheduleOperator) GetScheduleConfig(ctx context.Context) (*schedulev1alpha1.ClusterScheduleConfig, error) {
+	configMap, err := o.k8sClient.CoreV1().ConfigMaps(constants.KubesphereScheduleNamespace).Get(context.Background(), configName, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorln(err)
+		return nil, err
+	}
+
+	config := schedulev1alpha1.ClusterScheduleConfig{}
+	if err := json.Unmarshal([]byte(configMap.Data["config"]), &config); err != nil {
+		klog.Errorln(err)
+		return nil, err
+	}
+	return &config, nil
+}
+
+// UpdateKubeconfig Update client key and client certificate after CertificateSigningRequest has been approved
+func (o *scheduleOperator) SaveScheduleConfig(ctx context.Context, config *schedulev1alpha1.ClusterScheduleConfig) error {
+	configMap, err := o.k8sClient.CoreV1().ConfigMaps(constants.KubesphereScheduleNamespace).Get(context.Background(), configName, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorln(err)
+		return err
+	}
+
+	data, err := json.Marshal(&config)
+	if err != nil {
+		klog.Errorln(err)
+		return err
+	}
+
+	configMap.Data["config"] = string(data)
+	_, err = o.k8sClient.CoreV1().ConfigMaps(constants.KubesphereScheduleNamespace).Update(context.Background(), configMap, metav1.UpdateOptions{})
+	if err != nil {
+		klog.Errorln(err)
+		return err
+	}
+	return nil
 }

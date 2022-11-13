@@ -19,15 +19,15 @@ package analysis
 import (
 	"context"
 	"fmt"
-	"strings"
-	"sync"
-
+	"github.com/go-logr/logr"
 	cranev1alpha1 "github.com/gocrane/api/analysis/v1alpha1"
 	cranev1informer "github.com/gocrane/api/pkg/generated/informers/externalversions/analysis/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	urlruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -46,36 +46,24 @@ import (
 	"kubesphere.io/schedule/pkg/utils/sliceutil"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	"strings"
 )
-
-type Mutating struct {
-	*AnalysisTaskReconciler
-}
-
-func (m *Mutating) Handle(ctx context.Context, request admission.Request) admission.Response {
-	return m.AnalysisTaskReconciler.Mutating(ctx, request)
-}
-
-type Validating struct {
-	*AnalysisTaskReconciler
-}
-
-func (m *Validating) Handle(ctx context.Context, request admission.Request) admission.Response {
-	return m.AnalysisTaskReconciler.Validating(ctx, request)
-}
 
 // AnalysisTaskReconciler reconciles a Analysis object
 type AnalysisTaskReconciler struct {
-	sync.Mutex
 	client.Client
-	Scheme *runtime.Scheme
+	Log        logr.Logger
+	Scheme     *runtime.Scheme
+	ctx        context.Context
+	Recorder   record.EventRecorder
+	restMapper meta.RESTMapper
 
 	ClusterScheduleConfig *schedulev1alpha1.ClusterScheduleConfig
 
-	Recorder                   record.EventRecorder
 	K8SClient                  k8s.Client
 	ScheduleClient             schedule.Operator
 	AnalyticsInformer          cranev1informer.AnalyticsInformer
@@ -119,54 +107,39 @@ type AnalysisTaskReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *AnalysisTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
-
-	klog.Infof("Reconcile AnalysisTask %s", req.NamespacedName)
+	log := r.Log.WithValues("AnalysisTask", req.NamespacedName)
 
 	instance := &v1alpha1.AnalysisTask{}
-	err := r.Client.Get(ctx, req.NamespacedName, instance)
-	if apierrors.IsNotFound(err) {
-		return ctrl.Result{}, nil
-	}
-	if err != nil {
-		return ctrl.Result{}, err
+	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.V(1).Info("AnalysisTask deleted", "error", err)
+		}
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	isDeletion := !instance.ObjectMeta.DeletionTimestamp.IsZero()
-	isConstructed := sliceutil.HasString(instance.ObjectMeta.Finalizers, constants.AnalysisTaskFinalizer)
-
-	if isDeletion { // delete
-		if isConstructed {
+	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(instance, constants.AnalysisTaskFinalizer) {
+			controllerutil.AddFinalizer(instance, constants.AnalysisTaskFinalizer)
+			instance.Status.Status = v1alpha1.UpdatingStatus
+			if err := r.Update(context.Background(), instance); err != nil {
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, nil
+		}
+	} else {
+		if controllerutil.ContainsFinalizer(instance, constants.AnalysisTaskFinalizer) {
 			if _, err := r.undoReconcile(ctx, instance); err != nil {
 				return reconcile.Result{}, err
 			}
-
-			instance.ObjectMeta.Finalizers = sliceutil.RemoveString(instance.ObjectMeta.Finalizers, func(item string) bool {
-				if item == constants.AnalysisTaskFinalizer {
-					return true
-				}
-				return false
-			})
-			if err := r.Update(context.Background(), instance); err != nil {
-				return reconcile.Result{}, err
-			}
-			return reconcile.Result{}, nil
-		}
-	} else { // create or update
-		if !isConstructed {
-			if err = r.UpdateAnalysisTaskStatus(ctx, instance, v1alpha1.UpdatingStatus); err != nil {
-				return reconcile.Result{}, err
-			}
-			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, constants.AnalysisTaskFinalizer)
-			if err := r.Update(context.Background(), instance); err != nil {
-				return reconcile.Result{}, err
-			}
-			return reconcile.Result{}, nil
-		} else {
-			if _, err := r.doReconcile(ctx, instance); err != nil {
-				return reconcile.Result{}, err
+			controllerutil.RemoveFinalizer(instance, constants.AnalysisTaskFinalizer)
+			if err := r.Update(ctx, instance); err != nil {
+				return ctrl.Result{}, err
 			}
 		}
+		return ctrl.Result{}, nil
+	}
+	if _, err := r.doReconcile(ctx, instance); err != nil {
+		return reconcile.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -183,7 +156,7 @@ func (r *AnalysisTaskReconciler) doReconcile(ctx context.Context, instance *sche
 		return ctrl.Result{}, nil
 	}
 	if err != nil {
-		r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.ErrorStatus)
+		r.updateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.ErrorStatus)
 	}
 	return
 }
@@ -204,7 +177,7 @@ func (r *AnalysisTaskReconciler) doReconcileWorkloadAnalysis(ctx context.Context
 	_ = log.FromContext(ctx)
 	hasError := false
 	namespace := instance.Namespace
-	workloads := strings.Split(r.GetNamespacesWorkloads(ctx, namespace), ",")
+	workloads := strings.Split(r.getNamespacesWorkloads(ctx, namespace), ",")
 	for _, resource := range instance.Spec.ResourceSelectors {
 		workload := corev1.ObjectReference{
 			Kind:       resource.Kind,
@@ -227,22 +200,22 @@ func (r *AnalysisTaskReconciler) doReconcileWorkloadAnalysis(ctx context.Context
 	}
 	r.UpdateIndexCache(instance)
 	if hasError {
-		err := r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.ErrorStatus)
+		err := r.updateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.ErrorStatus)
 		return ctrl.Result{}, err
 	}
 
 	workloads = sliceutil.RemoveString(workloads, func(item string) bool { return item == "" })
-	if err := r.UpdateNamespacesWorkloads(ctx, namespace, strings.Join(workloads, ",")); err != nil {
+	if err := r.updateNamespacesWorkloads(ctx, namespace, strings.Join(workloads, ",")); err != nil {
 		klog.Errorf("get deployment error: %s", err.Error())
 		return ctrl.Result{}, err
 	}
 
 	var err error
 	if instance.Spec.CompletionStrategy.CompletionStrategyType == v1alpha1.CompletionStrategyOnce {
-		err = r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.CompletedStatus)
+		err = r.updateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.CompletedStatus)
 	}
 	if instance.Spec.CompletionStrategy.CompletionStrategyType == v1alpha1.CompletionStrategyPeriodical {
-		err = r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.RunningStatus)
+		err = r.updateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.RunningStatus)
 	}
 	if err != nil {
 		klog.Errorf("update analysis task status error: %s", err.Error())
@@ -299,7 +272,7 @@ func (r *AnalysisTaskReconciler) doReconcileNamespaceAnalysis(ctx context.Contex
 		r.UpdateIndexCache(instance)
 
 		// overwrite Namespaces Annotations
-		err = r.UpdateNamespacesWorkloads(ctx, namespace, "")
+		err = r.updateNamespacesWorkloads(ctx, namespace, "")
 		if err != nil {
 			klog.Errorf("get deployment error: %s", err.Error())
 			return ctrl.Result{}, err
@@ -308,10 +281,10 @@ func (r *AnalysisTaskReconciler) doReconcileNamespaceAnalysis(ctx context.Contex
 
 	var err error
 	if instance.Spec.CompletionStrategy.CompletionStrategyType == v1alpha1.CompletionStrategyOnce {
-		err = r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.CompletedStatus)
+		err = r.updateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.CompletedStatus)
 	}
 	if instance.Spec.CompletionStrategy.CompletionStrategyType == v1alpha1.CompletionStrategyPeriodical {
-		err = r.UpdateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.RunningStatus)
+		err = r.updateAnalysisTaskStatus(ctx, instance, schedulev1alpha1.RunningStatus)
 	}
 	if err != nil {
 		klog.Errorf("update analysis task status error: %s", err.Error())
@@ -326,7 +299,7 @@ func (r *AnalysisTaskReconciler) reconcileNamespaceAnalysis(ctx context.Context,
 		return ctrl.Result{}, err
 	}
 	for _, resource := range deployments.Items {
-		workload := getObjectReference(resource)
+		workload, _ := getObjectReference(resource)
 		workload.Namespace = namespace
 		err := r.CreateCraneAnalysis(ctx, workload, instance)
 		if err != nil {
@@ -341,7 +314,7 @@ func (r *AnalysisTaskReconciler) reconcileNamespaceAnalysis(ctx context.Context,
 		return ctrl.Result{}, err
 	}
 	for _, resource := range statefulSets.Items {
-		workload := getObjectReference(resource)
+		workload, _ := getObjectReference(resource)
 		workload.Namespace = namespace
 		err := r.CreateCraneAnalysis(ctx, workload, instance)
 		if err != nil {
@@ -356,7 +329,7 @@ func (r *AnalysisTaskReconciler) reconcileNamespaceAnalysis(ctx context.Context,
 		return ctrl.Result{}, err
 	}
 	for _, resource := range daemonSets.Items {
-		workload := getObjectReference(resource)
+		workload, _ := getObjectReference(resource)
 		workload.Namespace = namespace
 		err := r.CreateCraneAnalysis(ctx, workload, instance)
 		if err != nil {
@@ -365,11 +338,13 @@ func (r *AnalysisTaskReconciler) reconcileNamespaceAnalysis(ctx context.Context,
 		}
 	}
 
-	r.UpdateNamespaceAnalysisTaskLabel(ctx, namespace, instance)
+	r.updateNamespaceTaskLabel(ctx, namespace, instance)
 	return ctrl.Result{}, nil
 }
 
 func (r *AnalysisTaskReconciler) undoReconcileNamespaceAnalysis(ctx context.Context, instance *schedulev1alpha1.AnalysisTask) (ctrl.Result, error) {
+	log := r.Log.WithName("undoReconcileNamespaceAnalysis")
+
 	for _, resource := range instance.Spec.ResourceSelectors {
 		if resource.Kind != schedulev1alpha1.NamespaceResourceType ||
 			resource.Name == "" {
@@ -379,121 +354,80 @@ func (r *AnalysisTaskReconciler) undoReconcileNamespaceAnalysis(ctx context.Cont
 		namespace := resource.Name
 		r.NameSpaceAnalysisTaskCache[namespace] = instance
 
-		deployments, err := r.K8SClient.Kubernetes().AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			klog.Errorf("get deployment error: %s", err.Error())
+		options := &client.MatchingLabels{
+			constants.AnalysisTaskLabelKey: instance.Name,
+		}
+		deployments := &appsv1.DeploymentList{}
+		if err := r.List(ctx, deployments, options); err != nil {
+			log.Error(err, "Failed to Get Deployments")
 			return ctrl.Result{}, err
 		}
 		for _, resource := range deployments.Items {
-			if Label(resource.Labels, constants.AnalysisTaskLabelKey) == instance.Name {
-				if err := r.DeleteCraneAnalysis(ctx, corev1.ObjectReference{
-					Kind:       resource.Kind,
-					Name:       resource.Name,
-					APIVersion: resource.APIVersion,
-					Namespace:  namespace,
-				}, instance); err != nil {
-					klog.Errorf("delete analysis error: %s", err.Error())
-					return ctrl.Result{}, err
-				}
+			if err := r.DeleteCraneAnalysis(ctx, corev1.ObjectReference{
+				Kind:       resource.Kind,
+				Name:       resource.Name,
+				APIVersion: resource.APIVersion,
+				Namespace:  namespace,
+			}, instance); err != nil {
+				klog.Errorf("delete analysis error: %s", err.Error())
+				return ctrl.Result{}, err
 			}
 		}
 
-		statefulSets, err := r.K8SClient.Kubernetes().AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			klog.Errorf("get deployment error: %s", err.Error())
+		statefulSets := &appsv1.StatefulSetList{}
+		if err := r.List(ctx, statefulSets, options); err != nil {
+			log.Error(err, "Failed to Get Deployments")
 			return ctrl.Result{}, err
 		}
 		for _, resource := range statefulSets.Items {
-			if Label(resource.Labels, constants.AnalysisTaskLabelKey) == instance.Name {
-				if err := r.DeleteCraneAnalysis(ctx, corev1.ObjectReference{
-					Kind:       resource.Kind,
-					Name:       resource.Name,
-					APIVersion: resource.APIVersion,
-					Namespace:  namespace,
-				}, instance); err != nil {
-					klog.Errorf("delete analysis error: %s", err.Error())
-					return ctrl.Result{}, err
-				}
+			if err := r.DeleteCraneAnalysis(ctx, corev1.ObjectReference{
+				Kind:       resource.Kind,
+				Name:       resource.Name,
+				APIVersion: resource.APIVersion,
+				Namespace:  namespace,
+			}, instance); err != nil {
+				klog.Errorf("delete analysis error: %s", err.Error())
+				return ctrl.Result{}, err
 			}
 		}
 
-		daemonSets, err := r.K8SClient.Kubernetes().AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			klog.Errorf("get deployment error: %s", err.Error())
+		daemonSets := &appsv1.DaemonSetList{}
+		if err := r.List(ctx, daemonSets, options); err != nil {
+			log.Error(err, "Failed to Get Deployments")
 			return ctrl.Result{}, err
 		}
 		for _, resource := range daemonSets.Items {
-			if Label(resource.Labels, constants.AnalysisTaskLabelKey) == instance.Name {
-				if err := r.DeleteCraneAnalysis(ctx, corev1.ObjectReference{
-					Kind:       resource.Kind,
-					Name:       resource.Name,
-					APIVersion: resource.APIVersion,
-					Namespace:  namespace,
-				}, instance); err != nil {
-					klog.Errorf("delete analysis error: %s", err.Error())
-					return ctrl.Result{}, err
-				}
+			if err := r.DeleteCraneAnalysis(ctx, corev1.ObjectReference{
+				Kind:       resource.Kind,
+				Name:       resource.Name,
+				APIVersion: resource.APIVersion,
+				Namespace:  namespace,
+			}, instance); err != nil {
+				klog.Errorf("delete analysis error: %s", err.Error())
+				return ctrl.Result{}, err
 			}
 		}
 
-		r.CleanNamespaceAnalysisTaskLabel(ctx, namespace)
+		r.cleanNamespaceTaskLabel(ctx, namespace)
 	}
 	return ctrl.Result{}, nil
 }
 
 func (r *AnalysisTaskReconciler) handleWorkloadUpdateEvent(workload interface{}) {
-	switch workload := workload.(type) {
-	case *appsv1.Deployment:
-		namespace := workload.Namespace
-		if analysisTask, ok := r.NameSpaceAnalysisTaskCache[namespace]; ok {
-			oldTask := r.GetAnalysisTask(namespace, Label(workload.Labels, constants.AnalysisTaskLabelKey))
-			if oldTask != nil {
-				return
-			}
-			objectRef := getObjectReference(workload)
-			objectRef.Namespace = namespace
-			err := r.CreateCraneAnalysis(context.Background(), objectRef, analysisTask)
-			if err != nil {
-				klog.Errorf("create crane analysis failed, err: %v", err)
-				return
-			}
-		} else {
-			klog.V(4).Infof("skip create deployment analysis %s", workload.Name)
+	objectRef, oldTaskKey := getObjectReference(workload)
+	namespace := objectRef.Namespace
+	if analysisTask, ok := r.NameSpaceAnalysisTaskCache[namespace]; ok {
+		oldTask := r.GetAnalysisTask(namespace, oldTaskKey)
+		if oldTask != nil {
+			return
 		}
-	case *appsv1.StatefulSet:
-		namespace := workload.Namespace
-		if analysisTask, ok := r.NameSpaceAnalysisTaskCache[namespace]; ok {
-			oldTask := r.GetAnalysisTask(namespace, Label(workload.Labels, constants.AnalysisTaskLabelKey))
-			if oldTask != nil {
-				return
-			}
-			objectRef := getObjectReference(workload)
-			objectRef.Namespace = namespace
-			err := r.CreateCraneAnalysis(context.Background(), objectRef, analysisTask)
-			if err != nil {
-				klog.Errorf("create crane analysis failed, err: %v", err)
-				return
-			}
-		} else {
-			klog.V(4).Infof("skip create deployment analysis %s", workload.Name)
+		err := r.CreateCraneAnalysis(context.Background(), objectRef, analysisTask)
+		if err != nil {
+			klog.Errorf("create crane analysis failed, err: %v", err)
+			return
 		}
-	case *appsv1.DaemonSet:
-		namespace := workload.Namespace
-		if analysisTask, ok := r.NameSpaceAnalysisTaskCache[namespace]; ok {
-			oldTask := r.GetAnalysisTask(namespace, Label(workload.Labels, constants.AnalysisTaskLabelKey))
-			if oldTask != nil {
-				return
-			}
-			objectRef := getObjectReference(workload)
-			objectRef.Namespace = namespace
-			err := r.CreateCraneAnalysis(context.Background(), objectRef, analysisTask)
-			if err != nil {
-				klog.Errorf("create crane analysis failed, err: %v", err)
-				return
-			}
-		} else {
-			klog.V(4).Infof("skip create deployment analysis %s", workload.Name)
-		}
+	} else {
+		klog.V(4).Infof("skip create deployment analysis %s", objectRef.Name)
 	}
 }
 
@@ -613,6 +547,7 @@ func (r *AnalysisTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	urlruntime.Must(NotNil(r.NameSpaceAnalysisTaskCache))
 	urlruntime.Must(NotNil(r.AnalysisTaskReverseIndex))
 
+	r.Log = mgr.GetLogger().WithName("controllers").WithName("AnalysisTask")
 	r.DeploymentsInformer.Informer().AddEventHandler(r.WorkloadEventHandler())
 	r.DaemonSetsInformer.Informer().AddEventHandler(r.WorkloadEventHandler())
 	r.StatefulSetsInformer.Informer().AddEventHandler(r.WorkloadEventHandler())
@@ -627,43 +562,8 @@ func (r *AnalysisTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// set scheduler for workloads
-func (r *AnalysisTaskReconciler) Mutating(ctx context.Context, request admission.Request) admission.Response {
-	var workload client.Object
-	var key = client.ObjectKey{request.Namespace, request.Name}
-	switch request.Kind.Kind {
-	case "Deployment":
-		var deploy = &appsv1.Deployment{}
-		err := r.Get(ctx, key, deploy)
-		if err != nil {
-			klog.Errorf("get Deployment error, %s", err.Error())
-			return admission.Denied("Workload not found.")
-		}
-		deploy.Spec.Template.Spec.SchedulerName = r.ClusterScheduleConfig.DefaultScheduler
-		workload = deploy
-	case "StatefulSet":
-		var state = &appsv1.StatefulSet{}
-		err := r.Get(ctx, key, state)
-		if err != nil {
-			klog.Errorf("get StatefulSet error, %s", err.Error())
-			return admission.Denied("Workload not found.")
-		}
-		state.Spec.Template.Spec.SchedulerName = r.ClusterScheduleConfig.DefaultScheduler
-		workload = state
-	default:
-		return admission.Allowed("Kind do not match, pass.")
-	}
-
-	err := r.Update(ctx, workload)
-	if err != nil {
-		klog.Errorf("update Workload error, %s", err.Error())
-		return admission.Denied("Workload update failed.")
-	}
-	return admission.Allowed("Workload update was successful.")
-}
-
 func (r *AnalysisTaskReconciler) Validating(ctx context.Context, request admission.Request) admission.Response {
-	return admission.Denied("@TODO Validating")
+	return admission.Allowed("@TODO Validating")
 }
 
 func genAnalysis(resource corev1.ObjectReference, instance *schedulev1alpha1.AnalysisTask) *cranev1alpha1.Analytics {
@@ -673,7 +573,29 @@ func genAnalysis(resource corev1.ObjectReference, instance *schedulev1alpha1.Ana
 	return analytics
 }
 
+func (r *AnalysisTaskReconciler) CreateCraneAnalysis(ctx context.Context, resource corev1.ObjectReference, instance *v1alpha1.AnalysisTask) (err error) {
+	log := r.Log.WithName("CreateCraneAnalysis")
+
+	if err := r.updateWorkloadTaskLabel(ctx, resource, instance); err != nil {
+		log.Error(err, "update workload error")
+		return err
+	}
+
+	analytics := genAnalysis(resource, instance)
+	if err := r.ScheduleClient.CreateCraneAnalysis(ctx, instance.Namespace, analytics); err != nil {
+		log.Error(err, "creat analysis error %s")
+		return err
+	}
+
+	r.Recorder.Event(instance, corev1.EventTypeNormal, "CreateCraneAnalysis", fmt.Sprintf("Create CraneAnalysis %s/%s", resource.Namespace, resource.Name))
+	return
+}
+
 func (r *AnalysisTaskReconciler) DeleteCraneAnalysis(ctx context.Context, resource corev1.ObjectReference, instance *v1alpha1.AnalysisTask) (err error) {
+	if err = r.cleanWorkloadTaskLabel(ctx, resource, instance); err != nil {
+		return err
+	}
+
 	name := genAnalysisName(instance.Spec.Type, resource.Kind, resource.Name)
 	err = r.ScheduleClient.DeleteCraneAnalysis(ctx, resource.Namespace, name)
 	if err != nil {
@@ -683,146 +605,73 @@ func (r *AnalysisTaskReconciler) DeleteCraneAnalysis(ctx context.Context, resour
 	return
 }
 
-func (r *AnalysisTaskReconciler) CreateCraneAnalysis(ctx context.Context, resource corev1.ObjectReference, instance *v1alpha1.AnalysisTask) (err error) {
-	switch resource.Kind {
-	case v1alpha1.DeploymentResource:
-		err = r.CreateDeploymentCraneAnalysis(ctx, resource, instance)
-	case v1alpha1.StatefulSetResource:
-		err = r.CreateStatefulSetCraneAnalysis(ctx, resource, instance)
-	case v1alpha1.DaemonSetResource:
-		err = r.CreateDaemonSetCraneAnalysis(ctx, resource, instance)
-	default:
-		err = fmt.Errorf("not support resource %s kind %s", resource.Name, resource.Kind)
-		r.Recorder.Event(instance, corev1.EventTypeWarning, "CreateCraneAnalysis", err.Error())
-		return nil
-	}
-	r.Recorder.Event(instance, corev1.EventTypeNormal, "CreateCraneAnalysis", fmt.Sprintf("Create CraneAnalysis %s/%s", resource.Namespace, resource.Name))
-	return
-}
+func (r *AnalysisTaskReconciler) updateWorkloadTaskLabel(ctx context.Context, resource corev1.ObjectReference, instance *v1alpha1.AnalysisTask) error {
+	log := r.Log.WithName("updateAnalysisTaskLabel")
 
-func (r *AnalysisTaskReconciler) CreateDeploymentCraneAnalysis(ctx context.Context, resource corev1.ObjectReference, instance *v1alpha1.AnalysisTask) error {
-	workload, err := r.K8SClient.Kubernetes().AppsV1().Deployments(resource.Namespace).Get(ctx, resource.Name, metav1.GetOptions{})
+	gvkr, err := ParseGVKR(r.restMapper, resource.APIVersion, resource.Kind)
 	if err != nil {
-		return err
+		log.Error(err, "Failed to parse Group, Version, Kind, Resource", "apiVersion", resource.APIVersion, "kind", resource.Kind)
 	}
-	if oldTask := Label(workload.Labels, constants.AnalysisTaskLabelKey); oldTask != "" {
-		if err := r.ScheduleClient.DeleteCraneAnalysis(ctx, workload.Namespace, oldTask); err != nil {
-			klog.Errorf("remove old analysis failed: %s", err.Error())
-		}
+	gvkString := gvkr.GVKString()
+	log.V(1).Info("Parsed Group, Version, Kind, Resource", "GVK", gvkString, "Resource", gvkr.Resource)
+
+	unstruct := &unstructured.Unstructured{}
+	unstruct.SetGroupVersionKind(gvkr.GroupVersionKind())
+	log.V(1).Error(err, "Target resource doesn't exist", "resource", gvkString, "name", resource.Name, "Client", r.Client)
+	if err := r.Client.Get(ctx, client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}, unstruct); err != nil {
+		// resource doesn't exist
+		log.V(1).Error(err, "Target resource doesn't exist", "resource", gvkString, "name", resource.Name)
+		return client.IgnoreNotFound(err)
 	}
-	workloadCopy := workload.DeepCopy()
-	if workloadCopy.Labels == nil {
-		workloadCopy.Labels = make(map[string]string, 0)
+
+	labels := unstruct.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
 	}
-	workloadCopy.Labels[constants.AnalysisTaskLabelKey] = instance.Name
-	patch := client.MergeFrom(workload)
-	data, err := patch.Data(workloadCopy)
-	if err != nil {
-		klog.Error("create patch failed", err)
+	labels[constants.AnalysisTaskLabelKey] = instance.Name
+	unstruct.SetLabels(labels)
+	if err := r.Client.Update(ctx, unstruct); err != nil {
+		log.Error(err, "Failed to update target workload", "apiVersion", resource.APIVersion, "kind", resource.Kind)
 		return err
 	}
 
-	// data == "{}", need not to patch
-	if len(data) == 2 {
-		return nil
-	}
-
-	_, err = r.K8SClient.Kubernetes().AppsV1().Deployments(workload.Namespace).Patch(ctx, workload.Name, patch.Type(), data, metav1.PatchOptions{})
-	if err != nil {
-		klog.Error(err)
-		return err
-	}
-	analytics := genAnalysis(resource, instance)
-	if err := r.ScheduleClient.CreateCraneAnalysis(ctx, instance.Namespace, analytics); err != nil {
-		klog.Errorf("creat analysis error %s", err.Error())
-		return err
-	}
 	return nil
 }
 
-func (r *AnalysisTaskReconciler) CreateStatefulSetCraneAnalysis(ctx context.Context, resource corev1.ObjectReference, instance *v1alpha1.AnalysisTask) error {
-	workload, err := r.K8SClient.Kubernetes().AppsV1().StatefulSets(resource.Namespace).Get(ctx, resource.Name, metav1.GetOptions{})
+func (r *AnalysisTaskReconciler) cleanWorkloadTaskLabel(ctx context.Context, resource corev1.ObjectReference, instance *v1alpha1.AnalysisTask) error {
+	log := r.Log.WithName("updateAnalysisTaskLabel")
+
+	gvkr, err := ParseGVKR(r.restMapper, resource.APIVersion, resource.Kind)
 	if err != nil {
-		return err
+		log.Error(err, "Failed to parse Group, Version, Kind, Resource", "apiVersion", resource.APIVersion, "kind", resource.Kind)
 	}
-	if oldTask := Label(workload.Labels, constants.AnalysisTaskLabelKey); oldTask != "" {
-		if err := r.ScheduleClient.DeleteCraneAnalysis(ctx, workload.Namespace, oldTask); err != nil {
-			klog.Errorf("remove old analysis failed: %s", err.Error())
-		}
+	gvkString := gvkr.GVKString()
+	log.V(1).Info("Parsed Group, Version, Kind, Resource", "GVK", gvkString, "Resource", gvkr.Resource)
+
+	unstruct := &unstructured.Unstructured{}
+	unstruct.SetGroupVersionKind(gvkr.GroupVersionKind())
+	if err := r.Client.Get(ctx, client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}, unstruct); err != nil {
+		// resource doesn't exist
+		log.V(1).Error(err, "Target resource doesn't exist", "resource", gvkString, "name", resource.Name)
+		return client.IgnoreNotFound(err)
 	}
 
-	workloadCopy := workload.DeepCopy()
-	if workloadCopy.Labels == nil {
-		workloadCopy.Labels = make(map[string]string, 0)
-	}
-	workloadCopy.Labels[constants.AnalysisTaskLabelKey] = instance.Name
-	patch := client.MergeFrom(workload)
-	data, err := patch.Data(workloadCopy)
-	if err != nil {
-		klog.Error("create patch failed", err)
-		return err
-	}
-
-	// data == "{}", need not to patch
-	if len(data) == 2 {
+	labels := unstruct.GetLabels()
+	if labels == nil {
 		return nil
 	}
 
-	_, err = r.K8SClient.Kubernetes().AppsV1().StatefulSets(workload.Namespace).Patch(ctx, workload.Name, patch.Type(), data, metav1.PatchOptions{})
-	if err != nil {
-		klog.Error(err)
+	delete(labels, constants.AnalysisTaskLabelKey)
+	unstruct.SetLabels(labels)
+	if err := r.Client.Update(ctx, unstruct); err != nil {
+		log.Error(err, "Failed to clean target workload", "apiVersion", resource.APIVersion, "kind", resource.Kind)
 		return err
 	}
-	analytics := genAnalysis(resource, instance)
-	if err := r.ScheduleClient.CreateCraneAnalysis(ctx, instance.Namespace, analytics); err != nil {
-		klog.Errorf("creat analysis error %s", err.Error())
-		return err
-	}
+
 	return nil
 }
 
-func (r *AnalysisTaskReconciler) CreateDaemonSetCraneAnalysis(ctx context.Context, resource corev1.ObjectReference, instance *v1alpha1.AnalysisTask) error {
-	workload, err := r.K8SClient.Kubernetes().AppsV1().DaemonSets(resource.Namespace).Get(ctx, resource.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	if oldTask := Label(workload.Labels, constants.AnalysisTaskLabelKey); oldTask != "" {
-		if err := r.ScheduleClient.DeleteCraneAnalysis(ctx, workload.Namespace, oldTask); err != nil {
-			klog.Errorf("remove old analysis failed: %s", err.Error())
-		}
-	}
-
-	workloadCopy := workload.DeepCopy()
-	if workloadCopy.Labels == nil {
-		workloadCopy.Labels = make(map[string]string, 0)
-	}
-	workloadCopy.Labels[constants.AnalysisTaskLabelKey] = instance.Name
-	patch := client.MergeFrom(workload)
-	data, err := patch.Data(workloadCopy)
-	if err != nil {
-		klog.Error("create patch failed", err)
-		return err
-	}
-
-	// data == "{}", need not to patch
-	if len(data) == 2 {
-		return nil
-	}
-
-	_, err = r.K8SClient.Kubernetes().AppsV1().DaemonSets(workload.Namespace).Patch(ctx, workload.Name, patch.Type(), data, metav1.PatchOptions{})
-	if err != nil {
-		klog.Error(err)
-		return err
-	}
-	analytics := genAnalysis(resource, instance)
-	if err := r.ScheduleClient.CreateCraneAnalysis(ctx, instance.Namespace, analytics); err != nil {
-		klog.Errorf("creat analysis error %s", err.Error())
-		return err
-	}
-	return nil
-}
-
-func (r *AnalysisTaskReconciler) UpdateNamespaceAnalysisTaskLabel(ctx context.Context, namespace string, instance *v1alpha1.AnalysisTask) error {
+func (r *AnalysisTaskReconciler) updateNamespaceTaskLabel(ctx context.Context, namespace string, instance *v1alpha1.AnalysisTask) error {
 	ns, err := r.K8SClient.Kubernetes().CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -853,7 +702,7 @@ func (r *AnalysisTaskReconciler) UpdateNamespaceAnalysisTaskLabel(ctx context.Co
 	return nil
 }
 
-func (r *AnalysisTaskReconciler) CleanNamespaceAnalysisTaskLabel(ctx context.Context, namespace string) error {
+func (r *AnalysisTaskReconciler) cleanNamespaceTaskLabel(ctx context.Context, namespace string) error {
 	ns, err := r.K8SClient.Kubernetes().CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -884,17 +733,7 @@ func (r *AnalysisTaskReconciler) CleanNamespaceAnalysisTaskLabel(ctx context.Con
 	return nil
 }
 
-func (r *AnalysisTaskReconciler) GetNamespacesWorkloads(ctx context.Context, namespace string) string {
-	ns, err := r.K8SClient.Kubernetes().CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
-	if err != nil {
-		return ""
-	}
-
-	value := Label(ns.Annotations, constants.AnalysisTaskWorkloadAnnotationKey)
-	return value
-}
-
-func (r *AnalysisTaskReconciler) UpdateNamespacesWorkloads(ctx context.Context, namespace string, value string) error {
+func (r *AnalysisTaskReconciler) updateNamespacesWorkloads(ctx context.Context, namespace string, value string) error {
 	ns, err := r.K8SClient.Kubernetes().CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -931,7 +770,17 @@ func (r *AnalysisTaskReconciler) UpdateNamespacesWorkloads(ctx context.Context, 
 	return nil
 }
 
-func (r *AnalysisTaskReconciler) UpdateAnalysisTaskStatus(ctx context.Context, instance *schedulev1alpha1.AnalysisTask, status schedulev1alpha1.Status) error {
+func (r *AnalysisTaskReconciler) getNamespacesWorkloads(ctx context.Context, namespace string) string {
+	ns, err := r.K8SClient.Kubernetes().CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	if err != nil {
+		return ""
+	}
+
+	value := Label(ns.Annotations, constants.AnalysisTaskWorkloadAnnotationKey)
+	return value
+}
+
+func (r *AnalysisTaskReconciler) updateAnalysisTaskStatus(ctx context.Context, instance *schedulev1alpha1.AnalysisTask, status schedulev1alpha1.Status) error {
 	instance.Status.Status = status
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "Update", "update analysis task %s status to %s", instance.Name, status)
 	err := r.Status().Update(ctx, instance)

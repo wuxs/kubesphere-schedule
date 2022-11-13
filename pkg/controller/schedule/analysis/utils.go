@@ -63,7 +63,7 @@ func Label(labels map[string]string, name string) string {
 	return ""
 }
 
-func getObjectReference(workload interface{}) corev1.ObjectReference {
+func getObjectReference(workload interface{}) (obj corev1.ObjectReference, taskKey string) {
 	gv := appsv1.SchemeGroupVersion
 	switch workload := (workload).(type) {
 	case *appsv1.Deployment:
@@ -72,42 +72,42 @@ func getObjectReference(workload interface{}) corev1.ObjectReference {
 			APIVersion: gv.String(),
 			Name:       workload.Name,
 			Namespace:  workload.Namespace,
-		}
+		}, Label(workload.Labels, constants.AnalysisTaskLabelKey)
 	case appsv1.Deployment:
 		return corev1.ObjectReference{
 			Kind:       gv.WithKind("Deployment").Kind,
 			APIVersion: gv.String(),
 			Name:       workload.Name,
 			Namespace:  workload.Namespace,
-		}
+		}, Label(workload.Labels, constants.AnalysisTaskLabelKey)
 	case *appsv1.StatefulSet:
 		return corev1.ObjectReference{
 			Kind:       gv.WithKind("StatefulSet").Kind,
 			APIVersion: gv.String(),
 			Name:       workload.Name,
 			Namespace:  workload.Namespace,
-		}
+		}, Label(workload.Labels, constants.AnalysisTaskLabelKey)
 	case appsv1.StatefulSet:
 		return corev1.ObjectReference{
 			Kind:       gv.WithKind("StatefulSet").Kind,
 			APIVersion: gv.String(),
 			Name:       workload.Name,
 			Namespace:  workload.Namespace,
-		}
+		}, Label(workload.Labels, constants.AnalysisTaskLabelKey)
 	case *appsv1.DaemonSet:
 		return corev1.ObjectReference{
 			Kind:       gv.WithKind("DaemonSet").Kind,
 			APIVersion: gv.String(),
 			Name:       workload.Name,
 			Namespace:  workload.Namespace,
-		}
+		}, Label(workload.Labels, constants.AnalysisTaskLabelKey)
 	case appsv1.DaemonSet:
 		return corev1.ObjectReference{
 			Kind:       gv.WithKind("DaemonSet").Kind,
 			APIVersion: gv.String(),
 			Name:       workload.Name,
 			Namespace:  workload.Namespace,
-		}
+		}, Label(workload.Labels, constants.AnalysisTaskLabelKey)
 	default:
 		panic("unsupported workload type")
 	}

@@ -42,7 +42,7 @@ func addAllControllers(mgr manager.Manager, client k8s.Client, informerFactory i
 	// "analysis" controller
 	// if cmOptions.IsControllerEnabled("analysis") && !cmOptions.GatewayOptions.IsEmpty(){
 
-	scheduleClient := schedule.NewScheduleOperator(informerFactory, client.Kubernetes(), client.Schedule(), client.ExtResources(), client.Dynamic(), stopCh)
+	scheduleClient := schedule.NewScheduleOperator(informerFactory, client.Kubernetes(), client.Schedule(), client.ExtResources(), stopCh)
 	analysisReconciler := &analysis.AnalysisTaskReconciler{
 		Client:                     mgr.GetClient(),
 		K8SClient:                  client,
@@ -62,14 +62,15 @@ func addAllControllers(mgr manager.Manager, client k8s.Client, informerFactory i
 	addControllerWithSetup(mgr, "analysis", analysisReconciler)
 
 	//// Setup webhooks
-	klog.Info("setting up webhook server")
-	hookServer := mgr.GetWebhookServer()
-	mgr.GetFieldIndexer()
-	//
-	klog.Info("registering webhooks to the webhook server")
-	hookServer.Register("/mutate", &webhook.Admission{Handler: &analysis.Mutating{AnalysisTaskReconciler: analysisReconciler}})
-	//hookServer.Register("/validate", &webhook.Admission{Handler: &analysis.Validating{AnalysisTaskReconciler: analysisReconciler}})
-
+	if !cmOptions.DisableWebhookServer {
+		klog.Info("setting up webhook server")
+		hookServer := mgr.GetWebhookServer()
+		mgr.GetFieldIndexer()
+		//
+		klog.Info("registering webhooks to the webhook server")
+		hookServer.Register("/mutate", &webhook.Admission{Handler: &analysis.Mutating{AnalysisTaskReconciler: analysisReconciler}})
+		//hookServer.Register("/validate", &webhook.Admission{Handler: &analysis.Validating{AnalysisTaskReconciler: analysisReconciler}})
+	}
 	// log all controllers process result
 	for _, name := range allControllers {
 		if cmOptions.IsControllerEnabled(name) {
