@@ -38,7 +38,7 @@ const (
 	GroupName = "schedule.kubesphere.io"
 )
 
-var GroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
+var GroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
 func SwaggerObject(swo *spec.Swagger) {
 	swo.Info = &spec.Info{
