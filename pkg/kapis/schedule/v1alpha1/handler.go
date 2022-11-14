@@ -52,12 +52,12 @@ func NewScheduleClient(ksInformers informers.InformerFactory,
 		k8sClient,
 		scheduleClient,
 		resourcesClient,
-		dynamicClient, stopCh)
+		stopCh)
 }
 
 func (h *scheduleHandler) ListScheduler(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
-	objs, err := h.schedule.GetSchedulerConfig(ctx)
+	objs, err := h.schedule.GetScheduleConfig(ctx)
 	handleResponse(request, response, objs, err)
 }
 
