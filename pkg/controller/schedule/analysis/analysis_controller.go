@@ -19,6 +19,8 @@ package analysis
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/go-logr/logr"
 	cranev1alpha1 "github.com/gocrane/api/analysis/v1alpha1"
 	cranev1informer "github.com/gocrane/api/pkg/generated/informers/externalversions/analysis/v1alpha1"
@@ -50,7 +52,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	"strings"
 )
 
 // AnalysisTaskReconciler reconciles a Analysis object
@@ -60,7 +61,7 @@ type AnalysisTaskReconciler struct {
 	Scheme     *runtime.Scheme
 	ctx        context.Context
 	Recorder   record.EventRecorder
-	restMapper meta.RESTMapper
+	RestMapper meta.RESTMapper
 
 	ClusterScheduleConfig *schedulev1alpha1.ClusterScheduleConfig
 
@@ -582,7 +583,7 @@ func (r *AnalysisTaskReconciler) CreateCraneAnalysis(ctx context.Context, resour
 	}
 
 	analytics := genAnalysis(resource, instance)
-	if err := r.ScheduleClient.CreateCraneAnalysis(ctx, instance.Namespace, analytics); err != nil {
+	if err := r.ScheduleClient.CreateCraneAnalysis(ctx, resource.Namespace, analytics); err != nil {
 		log.Error(err, "creat analysis error %s")
 		return err
 	}
@@ -608,7 +609,7 @@ func (r *AnalysisTaskReconciler) DeleteCraneAnalysis(ctx context.Context, resour
 func (r *AnalysisTaskReconciler) updateWorkloadTaskLabel(ctx context.Context, resource corev1.ObjectReference, instance *v1alpha1.AnalysisTask) error {
 	log := r.Log.WithName("updateAnalysisTaskLabel")
 
-	gvkr, err := ParseGVKR(r.restMapper, resource.APIVersion, resource.Kind)
+	gvkr, err := ParseGVKR(r.RestMapper, resource.APIVersion, resource.Kind)
 	if err != nil {
 		log.Error(err, "Failed to parse Group, Version, Kind, Resource", "apiVersion", resource.APIVersion, "kind", resource.Kind)
 	}
@@ -617,7 +618,6 @@ func (r *AnalysisTaskReconciler) updateWorkloadTaskLabel(ctx context.Context, re
 
 	unstruct := &unstructured.Unstructured{}
 	unstruct.SetGroupVersionKind(gvkr.GroupVersionKind())
-	log.V(1).Error(err, "Target resource doesn't exist", "resource", gvkString, "name", resource.Name, "Client", r.Client)
 	if err := r.Client.Get(ctx, client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}, unstruct); err != nil {
 		// resource doesn't exist
 		log.V(1).Error(err, "Target resource doesn't exist", "resource", gvkString, "name", resource.Name)
@@ -641,7 +641,7 @@ func (r *AnalysisTaskReconciler) updateWorkloadTaskLabel(ctx context.Context, re
 func (r *AnalysisTaskReconciler) cleanWorkloadTaskLabel(ctx context.Context, resource corev1.ObjectReference, instance *v1alpha1.AnalysisTask) error {
 	log := r.Log.WithName("updateAnalysisTaskLabel")
 
-	gvkr, err := ParseGVKR(r.restMapper, resource.APIVersion, resource.Kind)
+	gvkr, err := ParseGVKR(r.RestMapper, resource.APIVersion, resource.Kind)
 	if err != nil {
 		log.Error(err, "Failed to parse Group, Version, Kind, Resource", "apiVersion", resource.APIVersion, "kind", resource.Kind)
 	}

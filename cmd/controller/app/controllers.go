@@ -47,6 +47,7 @@ func addAllControllers(mgr manager.Manager, client k8s.Client, informerFactory i
 		Client:                     mgr.GetClient(),
 		K8SClient:                  client,
 		Recorder:                   mgr.GetEventRecorderFor("analysis-task-controller"),
+		RestMapper:                 mgr.GetRESTMapper(),
 		ScheduleClient:             scheduleClient,
 		DeploymentsInformer:        informerFactory.KubernetesSharedInformerFactory().Apps().V1().Deployments(),
 		DaemonSetsInformer:         informerFactory.KubernetesSharedInformerFactory().Apps().V1().DaemonSets(),
