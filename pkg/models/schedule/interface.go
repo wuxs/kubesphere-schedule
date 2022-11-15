@@ -43,7 +43,7 @@ import (
 )
 
 const (
-	configName           = "schedule-config"
+	configName           = "kubesphere-schedule-config"
 	configMapPrefix      = "kubeconfig-"
 	kubeconfigNameFormat = configMapPrefix + "%s"
 	defaultClusterName   = "local"
