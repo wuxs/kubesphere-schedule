@@ -18,7 +18,11 @@ package analysis
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+
 	appsv1 "k8s.io/api/apps/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -50,7 +54,10 @@ func (r *AnalysisTaskReconciler) Mutating(ctx context.Context, request admission
 		err := r.Get(ctx, key, deploy)
 		if err != nil {
 			klog.Errorf("get Deployment error, %s", err.Error())
-			return admission.Denied("Workload not found.")
+			if apierrors.IsNotFound(err) {
+				return admission.Denied("Deployment not found.")
+			}
+			return admission.Denied("Get Deployment error.")
 		}
 		deploy.Spec.Template.Spec.SchedulerName = r.ClusterScheduleConfig.DefaultScheduler
 		workload = deploy
@@ -59,18 +66,33 @@ func (r *AnalysisTaskReconciler) Mutating(ctx context.Context, request admission
 		err := r.Get(ctx, key, state)
 		if err != nil {
 			klog.Errorf("get StatefulSet error, %s", err.Error())
-			return admission.Denied("Workload not found.")
+			if apierrors.IsNotFound(err) {
+				return admission.Denied("StatefulSet not found.")
+			}
+			return admission.Denied("Get StatefulSet error.")
 		}
 		state.Spec.Template.Spec.SchedulerName = r.ClusterScheduleConfig.DefaultScheduler
 		workload = state
+	case "DaemonSet":
+		var daemon = &appsv1.DaemonSet{}
+		err := r.Get(ctx, key, daemon)
+		if err != nil {
+			klog.Errorf("get DaemonSet error, %s", err.Error())
+			if apierrors.IsNotFound(err) {
+				return admission.Denied("DaemonSet not found.")
+			}
+			return admission.Denied("Get DaemonSet error.")
+		}
+		daemon.Spec.Template.Spec.SchedulerName = r.ClusterScheduleConfig.DefaultScheduler
+		workload = daemon
 	default:
 		return admission.Allowed("Kind do not match, pass.")
 	}
 
-	err := r.Update(ctx, workload)
+	marshaled, err := json.Marshal(workload)
 	if err != nil {
-		klog.Errorf("update Workload error, %s", err.Error())
-		return admission.Denied("Workload update failed.")
+		klog.Info("marshal pod error", "error", err, "namespace", request.Namespace, "name", request.Name)
+		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	return admission.Allowed("Workload update was successful.")
+	return admission.PatchResponseFromRaw(request.Object.Raw, marshaled)
 }
