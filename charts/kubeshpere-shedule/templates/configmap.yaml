@@ -1,0 +1,8 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: kubesphere-schedule-config
+  namespace: {{ .Release.Namespace | quote }}
+data:
+  config: >-
+    {"enable":true,"defaultScheduler":"kube-scheduler","schedulers":["kube-scheduler","crane-scheduler"],"analysis":{"notifyThreshold":{"mem":10,"cpu":25}}}
