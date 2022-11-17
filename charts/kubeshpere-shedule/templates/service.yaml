@@ -8,12 +8,12 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port.apiserver }}
-      targetPort: http
+      targetPort: {{ .Values.service.port.apiserver }}
       protocol: TCP
-      name: http
-    - port: {{ .Values.service.port.controller }}
-      targetPort: https
+      name: apiserver
+    - port: 443
+      targetPort: {{ .Values.service.port.controller }}
       protocol: TCP
-      name: https
+      name: controller
   selector:
     {{- include "kubesphere-schedule.selectorLabels" . | nindent 4 }}

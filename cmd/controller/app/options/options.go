@@ -19,9 +19,10 @@ package options
 import (
 	"flag"
 	"fmt"
-	genericoptions "kubesphere.io/schedule/pkg/server/options"
 	"strings"
 	"time"
+
+	genericoptions "kubesphere.io/schedule/pkg/server/options"
 
 	controllerconfig "kubesphere.io/schedule/pkg/config"
 
@@ -103,7 +104,7 @@ func (s *KubeSphereControllerManagerOptions) Flags(allControllerNameSelectors []
 		"Whether to enable leader election. This field should be enabled when controller manager"+
 		"deployed with multiple replicas.")
 
-	fs.BoolVar(&s.DisableWebhookServer, "disable-webhook-server", s.LeaderElect, ""+
+	fs.BoolVar(&s.DisableWebhookServer, "disable-webhook-server", s.DisableWebhookServer, ""+
 		"Whether to enable leader election. This field should be enabled when controller manager"+
 		"deployed with multiple replicas.")
 

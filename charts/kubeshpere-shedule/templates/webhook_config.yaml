@@ -25,36 +25,28 @@ data:
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: {{ include "kubesphere-schedule.fullname" . }}
+  name: {{ include "kubesphere-schedule.name" . }}
   labels:
-    app: {{ include "kubesphere-schedule.fullname" . }}
+    app: {{ include "kubesphere-schedule.name" . }}
 webhooks:
-- name: mutating.kubeedge.kubesphere.io
+- name: mutating.schedule.kubesphere.io
   clientConfig:
     service:
       namespace: {{ .Release.Namespace }}
-      name: {{ include "kubesphere-schedule.fullname" . }}
+      name: {{ include "kubesphere-schedule.name" . }}
       path: "/mutate"
     caBundle: {{ if $existingWebHookConfig }}{{ (index $existingWebHookConfig.webhooks 0).clientConfig.caBundle }}{{ else }}{{ b64enc $ca.Cert }}{{ end }}
   rules:
   - apiGroups:
-    - ""
+    - apps
     apiVersions:
     - v1
     resources:
     - deployments
+    - statefulsets
+    - daemonsets
     operations:
-    - CREATE
-    - UPDATE
-  - apiGroups:
-      - ""
-    apiVersions:
-      - v1
-    resources:
-      - statefulsets
-    operations:
-      - CREATE
-      - UPDATE
+    - "*"
   failurePolicy: Ignore
   sideEffects: None
-  admissionReviewVersions: ["v1", "v1beta1"]
+  admissionReviewVersions: ["v1"]

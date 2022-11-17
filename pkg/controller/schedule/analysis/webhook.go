@@ -22,22 +22,39 @@ import (
 	"net/http"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog"
+	schedulev1alpha1 "kubesphere.io/schedule/api/schedule/v1alpha1"
+	"kubesphere.io/schedule/pkg/constants"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 type Mutating struct {
 	*AnalysisTaskReconciler
+	decoder *admission.Decoder
 }
 
 func (m *Mutating) Handle(ctx context.Context, request admission.Request) admission.Response {
-	return m.AnalysisTaskReconciler.Mutating(ctx, request)
+	return m.AnalysisTaskReconciler.Mutating(ctx, request, m.decoder)
+}
+
+// InjectDecoder injects the decoder.
+func (m *Mutating) InjectDecoder(d *admission.Decoder) error {
+	m.decoder = d
+	return nil
 }
 
 type Validating struct {
 	*AnalysisTaskReconciler
+	decoder *admission.Decoder
+}
+
+// InjectDecoder injects the decoder.
+func (v Validating) InjectDecoder(d *admission.Decoder) error {
+	v.decoder = d
+	return nil
 }
 
 func (m *Validating) Handle(ctx context.Context, request admission.Request) admission.Response {
@@ -45,54 +62,81 @@ func (m *Validating) Handle(ctx context.Context, request admission.Request) admi
 }
 
 // set scheduler for workloads
-func (r *AnalysisTaskReconciler) Mutating(ctx context.Context, request admission.Request) admission.Response {
+func (r *AnalysisTaskReconciler) Mutating(ctx context.Context, request admission.Request, decoder *admission.Decoder) admission.Response {
+	cm := &corev1.ConfigMap{}
+	key := client.ObjectKey{Namespace: constants.KubesphereScheduleNamespace, Name: constants.KubesphereScheduleConfigMap}
+	err := r.Get(ctx, key, cm)
+	if err != nil {
+		klog.Errorf("get ConfigMap error, %s", err.Error())
+		if apierrors.IsNotFound(err) {
+			return admission.Allowed("ConfigMap not found, skip")
+		}
+		return admission.Allowed("Get ConfigMap error, skip")
+	}
+	scheduleConfig := &schedulev1alpha1.ClusterScheduleConfig{}
+
+	if data, ok := cm.Data["config"]; ok {
+		err = json.Unmarshal([]byte(data), scheduleConfig)
+		if err != nil {
+			klog.Errorf("Unmarshal schedule config error, %s, skip", err.Error())
+			return admission.Allowed("Unmarshal schedule config error, skip")
+		}
+	} else {
+		klog.Errorf("schedule config do not exists, %s, skip")
+		return admission.Allowed("Schedule config do not exists, skip")
+	}
+
+	defaultScheduler := scheduleConfig.DefaultScheduler
+	if defaultScheduler == "kube-scheduler" {
+		defaultScheduler = "default-scheduler"
+	}
+	klog.Info("Mutating webhook request ", " defaultScheduler ", defaultScheduler, " scheduleConfig ", scheduleConfig)
+
 	var workload client.Object
-	var key = client.ObjectKey{request.Namespace, request.Name}
 	switch request.Kind.Kind {
 	case "Deployment":
 		var deploy = &appsv1.Deployment{}
-		err := r.Get(ctx, key, deploy)
+		err := decoder.Decode(request, deploy)
 		if err != nil {
-			klog.Errorf("get Deployment error, %s", err.Error())
-			if apierrors.IsNotFound(err) {
-				return admission.Denied("Deployment not found.")
-			}
-			return admission.Denied("Get Deployment error.")
+			klog.Errorf("Decode Deployment error, %s", err.Error())
+			return admission.Allowed("Decode Deployment error, skip.")
 		}
-		deploy.Spec.Template.Spec.SchedulerName = r.ClusterScheduleConfig.DefaultScheduler
+		if deploy.Spec.Template.Spec.SchedulerName == "default-scheduler" {
+			deploy.Spec.Template.Spec.SchedulerName = defaultScheduler
+		}
 		workload = deploy
 	case "StatefulSet":
 		var state = &appsv1.StatefulSet{}
-		err := r.Get(ctx, key, state)
+		err := decoder.Decode(request, state)
 		if err != nil {
-			klog.Errorf("get StatefulSet error, %s", err.Error())
-			if apierrors.IsNotFound(err) {
-				return admission.Denied("StatefulSet not found.")
-			}
-			return admission.Denied("Get StatefulSet error.")
+			klog.Errorf("Decode StatefulSet error, %s", err.Error())
+			return admission.Allowed("Decode StatefulSet error, skip.")
 		}
-		state.Spec.Template.Spec.SchedulerName = r.ClusterScheduleConfig.DefaultScheduler
+		if state.Spec.Template.Spec.SchedulerName == "default-scheduler" {
+			state.Spec.Template.Spec.SchedulerName = defaultScheduler
+		}
 		workload = state
 	case "DaemonSet":
 		var daemon = &appsv1.DaemonSet{}
-		err := r.Get(ctx, key, daemon)
+		err := decoder.Decode(request, daemon)
 		if err != nil {
-			klog.Errorf("get DaemonSet error, %s", err.Error())
-			if apierrors.IsNotFound(err) {
-				return admission.Denied("DaemonSet not found.")
-			}
-			return admission.Denied("Get DaemonSet error.")
+			klog.Errorf("Decode DaemonSet error, %s", err.Error())
+			return admission.Allowed("Decode DaemonSet error, skip.")
 		}
-		daemon.Spec.Template.Spec.SchedulerName = r.ClusterScheduleConfig.DefaultScheduler
+		if daemon.Spec.Template.Spec.SchedulerName == "default-scheduler" {
+			daemon.Spec.Template.Spec.SchedulerName = defaultScheduler
+		}
 		workload = daemon
 	default:
+		klog.Info("Kind do not match, pass.")
 		return admission.Allowed("Kind do not match, pass.")
 	}
 
 	marshaled, err := json.Marshal(workload)
 	if err != nil {
-		klog.Info("marshal pod error", "error", err, "namespace", request.Namespace, "name", request.Name)
+		klog.Error("marshal workload error", "error", err, "namespace", request.Namespace, "name", request.Name)
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
+	klog.Info("patch success", string(marshaled))
 	return admission.PatchResponseFromRaw(request.Object.Raw, marshaled)
 }

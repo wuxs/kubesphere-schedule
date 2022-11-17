@@ -22,6 +22,7 @@ const (
 	KubeSystemNamespace           = "kube-system"
 	ScheduleNamespace             = "schedule-system"
 	KubesphereScheduleNamespace   = "kubesphere-schedule-system"
+	KubesphereScheduleConfigMap   = "kubesphere-schedule-config"
 	KubesphereScheduleElectionID  = "ks-schedule-controller-manager-leader-election"
 	IstioNamespace                = "istio-system"
 	KubeSphereMonitoringNamespace = "kubesphere-monitoring-system"
