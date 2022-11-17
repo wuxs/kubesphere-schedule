@@ -35,7 +35,7 @@ spec:
           imagePullPolicy: {{ .Values.image.controller.pullPolicy }}
           ports:
             - name: https
-              containerPort: 8443
+              containerPort: {{ .Values.service.port.controller }}
               protocol: TCP
           volumeMounts:
             - name: cert
@@ -50,7 +50,7 @@ spec:
           imagePullPolicy: {{ .Values.image.controller.pullPolicy }}
           ports:
             - name: http
-              containerPort: 9090
+              containerPort: {{ .Values.service.port.apiserver }}
               protocol: TCP
           volumeMounts:
             - name: cert

@@ -43,7 +43,6 @@ import (
 )
 
 const (
-	configName           = "kubesphere-schedule-config"
 	configMapPrefix      = "kubeconfig-"
 	kubeconfigNameFormat = configMapPrefix + "%s"
 	defaultClusterName   = "local"
@@ -288,7 +287,7 @@ func (s *scheduleOperator) GetNamespaces(item v1alpha1.AnalysisTask) []corev1.Ob
 
 // UpdateKubeconfig Update client key and client certificate after CertificateSigningRequest has been approved
 func (o *scheduleOperator) GetScheduleConfig(ctx context.Context) (*schedulev1alpha1.ClusterScheduleConfig, error) {
-	configMap, err := o.k8sClient.CoreV1().ConfigMaps(constants.KubesphereScheduleNamespace).Get(context.Background(), configName, metav1.GetOptions{})
+	configMap, err := o.k8sClient.CoreV1().ConfigMaps(constants.KubesphereScheduleNamespace).Get(context.Background(), constants.KubesphereScheduleConfigMap, metav1.GetOptions{})
 	if err != nil {
 		klog.Errorln(err)
 		return nil, err
@@ -304,7 +303,7 @@ func (o *scheduleOperator) GetScheduleConfig(ctx context.Context) (*schedulev1al
 
 // UpdateKubeconfig Update client key and client certificate after CertificateSigningRequest has been approved
 func (o *scheduleOperator) SaveScheduleConfig(ctx context.Context, config *schedulev1alpha1.ClusterScheduleConfig) error {
-	configMap, err := o.k8sClient.CoreV1().ConfigMaps(constants.KubesphereScheduleNamespace).Get(context.Background(), configName, metav1.GetOptions{})
+	configMap, err := o.k8sClient.CoreV1().ConfigMaps(constants.KubesphereScheduleNamespace).Get(context.Background(), constants.KubesphereScheduleConfigMap, metav1.GetOptions{})
 	if err != nil {
 		klog.Errorln(err)
 		return err
