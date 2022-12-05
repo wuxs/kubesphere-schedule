@@ -427,7 +427,7 @@ func (r *AnalysisTaskReconciler) handleWorkloadUpdateEvent(workload interface{})
 			return
 		}
 	} else {
-		log.Info(fmt.Sprintf("skip create deployment analysis %s", objectRef.Name))
+		log.Info(fmt.Sprintf("skip create workload analysis %s", objectRef.Name))
 	}
 }
 
@@ -622,7 +622,7 @@ func (r *AnalysisTaskReconciler) updateWorkloadTaskLabel(ctx context.Context, re
 		log.Error(err, "Failed to parse Group, Version, Kind, Resource", "apiVersion", resource.APIVersion, "kind", resource.Kind)
 	}
 	gvkString := gvkr.GVKString()
-	log.Info("Parsed Group, Version, Kind, Resource", "GVK", gvkString, "Resource", gvkr.Resource)
+	log.Info("Parsed Group, Version, Kind, Resource", "Name", resource.Name, "GVK", gvkString, "Resource", gvkr.Resource)
 
 	unstruct := &unstructured.Unstructured{}
 	unstruct.SetGroupVersionKind(gvkr.GroupVersionKind())
@@ -633,14 +633,14 @@ func (r *AnalysisTaskReconciler) updateWorkloadTaskLabel(ctx context.Context, re
 	}
 
 	usCopy := unstruct.DeepCopy()
-	labels := usCopy.GetLabels()
+	labels := unstruct.GetLabels()
 	if labels == nil {
 		labels = make(map[string]string)
 	}
 	labels[constants.AnalysisTaskLabelKey] = instance.Name
 	usCopy.SetLabels(labels)
 	patch := client.MergeFrom(unstruct)
-	if err := r.Client.Patch(ctx, usCopy, patch); err != nil {
+	if err = r.Client.Patch(ctx, usCopy, patch); err != nil {
 		log.Error(err, "Failed to patch target workload", "apiVersion", resource.APIVersion, "kind", resource.Kind)
 		return err
 	}
@@ -656,7 +656,7 @@ func (r *AnalysisTaskReconciler) cleanWorkloadTaskLabel(ctx context.Context, res
 		log.Error(err, "Failed to parse Group, Version, Kind, Resource", "apiVersion", resource.APIVersion, "kind", resource.Kind)
 	}
 	gvkString := gvkr.GVKString()
-	log.Info("Parsed Group, Version, Kind, Resource", "GVK", gvkString, "Resource", gvkr.Resource)
+	log.Info("Parsed Group, Version, Kind, Resource", "Name", resource.Name, "GVK", gvkString, "Resource", gvkr.Resource)
 
 	unstruct := &unstructured.Unstructured{}
 	unstruct.SetGroupVersionKind(gvkr.GroupVersionKind())
